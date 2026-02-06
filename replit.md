@@ -2,7 +2,7 @@
 
 ## Overview
 
-Origin Finance is a personal finance management mobile application built with Expo (React Native) and an Express.js backend. The app connects to users' bank accounts via Plaid, displays financial data (accounts, transactions, budgets, net worth), and includes an AI-powered financial advisor chat feature powered by OpenAI. The app uses a dark, neon-themed UI design and targets iOS, Android, and web platforms.
+Origin Finance is a personal finance management mobile application built with Expo (React Native) and a Python/FastAPI backend. The app connects to users' bank accounts via Plaid, displays financial data (accounts, transactions, budgets, net worth), and includes an AI-powered financial advisor chat feature powered by OpenAI. The app uses a dark, neon-themed UI design and targets iOS, Android, and web platforms.
 
 ## User Preferences
 
@@ -20,38 +20,44 @@ Preferred communication style: Simple, everyday language.
 - **Key UI patterns**:
   - Modals for Plaid bank connection (`app/plaid-link.tsx`) and AI advisor chat (`app/advisor-modal.tsx`)
   - Plaid Link runs inside a WebView
-  - The Advisor tab immediately redirects to its modal
+  - The Advisor tab shows a static landing screen with "Start Chat" button to prevent infinite modal loop
   - Error boundary component wraps the entire app
   - Keyboard handling via `react-native-keyboard-controller`
+  - Budget modals use KeyboardAvoidingView to keep inputs visible above keyboard on mobile
 
-### Backend (Express.js)
+### Backend (Python / FastAPI)
 
-- **Runtime**: Node.js with Express v5, written in TypeScript, compiled with `tsx` for dev and `esbuild` for production
-- **API structure**: All routes registered in `server/routes.ts` via `registerRoutes()` function
-- **CORS**: Dynamic origin allowlist based on Replit environment variables, plus localhost for development
+- **Runtime**: Python 3.11 with FastAPI and Uvicorn
+- **Entry point**: `server_py/main.py` — all routes, middleware, and static file serving in one file
+- **Launcher**: `server/index.ts` spawns the Python process (so the existing `npm run server:dev` workflow works unchanged)
+- **CORS**: Custom middleware with dynamic origin allowlist based on Replit environment variables, plus localhost for development
 - **Key API endpoints**:
   - `POST /api/plaid/create-link-token` - Initialize Plaid Link
   - `POST /api/plaid/exchange-token` - Exchange Plaid public token for access token
   - `GET /api/plaid/accounts` - Fetch connected bank accounts
-  - `GET /api/plaid/transactions` - Fetch transaction history
-  - `POST /api/advisor/chat` - AI financial advisor streaming chat
+  - `GET /api/plaid/transactions` - Fetch transaction history (last 7 days)
+  - `GET /api/plaid/balance` - Get account balances
+  - `GET /api/plaid/status` - Check if bank account is connected
+  - `POST /api/plaid/disconnect` - Disconnect bank account
+  - `POST /api/advisor/chat` - AI financial advisor streaming chat (SSE)
 - **Token storage**: Plaid access tokens are currently stored in-memory (server variable), not persisted to database
+- **Landing page**: `server/templates/landing-page.html` served at `/` with dynamic URL placeholder replacement
+- **Static files**: `/assets` and `/static-build` directories served for Expo builds
 
 ### Data Storage
 
-- **Database**: PostgreSQL with Drizzle ORM
+- **Database**: PostgreSQL with Drizzle ORM (used by Node.js integration modules)
 - **Schema location**: `shared/schema.ts` (main user schema) and `shared/models/chat.ts` (conversations and messages)
 - **Schema push**: Use `npm run db:push` (drizzle-kit push) to sync schema to database
 - **Current tables**:
   - `users` - id (UUID), username, password
   - `conversations` - id (serial), title, created_at
   - `messages` - id (serial), conversation_id (FK), role, content, created_at
-- **In-memory storage**: `server/storage.ts` provides a `MemStorage` class for user CRUD that doesn't use the database. This is a placeholder that could be migrated to use Drizzle/Postgres
 - **Client-side storage**: AsyncStorage for persisting connection state and demo mode flags
 
 ### Replit Integrations
 
-Located in `server/replit_integrations/`, these are pre-built modules:
+Located in `server/replit_integrations/`, these are pre-built Node.js modules (legacy, not actively used by Python backend):
 - **Chat**: Conversation CRUD with PostgreSQL storage, OpenAI streaming chat
 - **Audio**: Voice recording, speech-to-text, text-to-speech, voice chat streaming
 - **Image**: Image generation and editing via OpenAI's gpt-image-1 model
@@ -59,10 +65,9 @@ Located in `server/replit_integrations/`, these are pre-built modules:
 
 ### Build & Deployment
 
-- **Development**: Two processes run simultaneously — Expo dev server (`expo:dev`) and Express server (`server:dev`)
-- **Production build**: `expo:static:build` creates a static web bundle, `server:build` bundles the server with esbuild, `server:prod` serves the built app
-- **The Express server proxies to the Expo dev server** during development using `http-proxy-middleware`
-- **Landing page**: `server/templates/landing-page.html` served for non-API, non-static requests (likely a download/info page)
+- **Development**: Two processes run simultaneously — Expo dev server (`expo:dev`) and Python FastAPI server (via `server:dev` which launches `server_py/main.py`)
+- **Production build**: `expo:static:build` creates a static web bundle; production server setup needs updating for Python
+- **Landing page**: `server/templates/landing-page.html` served for root requests
 
 ### API Communication Pattern
 
@@ -74,9 +79,9 @@ Located in `server/replit_integrations/`, these are pre-built modules:
 
 ### Third-Party Services
 
-- **Plaid** (bank account connection): Uses Plaid Sandbox environment. Requires `PLAID_CLIENT_ID` and `PLAID_SECRET` environment variables. SDK: `plaid` npm package v41
-- **OpenAI** (AI advisor & integrations): Uses Replit's AI Integrations proxy. Requires `AI_INTEGRATIONS_OPENAI_API_KEY` and `AI_INTEGRATIONS_OPENAI_BASE_URL` environment variables. SDK: `openai` npm package v6
-- **PostgreSQL**: Connection via `DATABASE_URL` environment variable. Driver: `pg` package. ORM: Drizzle
+- **Plaid** (bank account connection): Uses Plaid Sandbox environment. Requires `PLAID_CLIENT_ID` and `PLAID_SECRET` environment variables. Python SDK: `plaid-python` v38
+- **OpenAI** (AI advisor): Uses Replit's AI Integrations proxy. Requires `AI_INTEGRATIONS_OPENAI_API_KEY` and `AI_INTEGRATIONS_OPENAI_BASE_URL` environment variables. Python SDK: `openai` v2
+- **PostgreSQL**: Connection via `DATABASE_URL` environment variable
 
 ### Required Environment Variables
 
@@ -88,14 +93,25 @@ Located in `server/replit_integrations/`, these are pre-built modules:
 - `REPLIT_DEV_DOMAIN` - Auto-set by Replit for development
 - `EXPO_PUBLIC_DOMAIN` - Set in dev script, used by frontend to reach API
 
-### Key NPM Dependencies
+### Key Python Dependencies (Backend)
+
+- `fastapi` - Web framework
+- `uvicorn` - ASGI server
+- `plaid-python` - Plaid banking API client
+- `openai` - OpenAI API client (async)
+- `httpx` - HTTP client
+- `sse-starlette` - Server-Sent Events support
+
+### Key NPM Dependencies (Frontend)
 
 - `expo` ~54.0.27 - Mobile app framework
 - `expo-router` ~6.0.17 - File-based routing
-- `express` ^5.0.1 - Backend server
-- `drizzle-orm` ^0.39.3 + `drizzle-kit` - Database ORM and migrations
-- `plaid` ^41.1.0 - Banking API client
-- `openai` ^6.18.0 - AI API client
 - `@tanstack/react-query` ^5.83.0 - Server state management
 - `react-native-reanimated`, `react-native-gesture-handler` - Animation and gestures
 - `react-native-webview` - Used for Plaid Link integration
+
+## Recent Changes
+
+- **2026-02-06**: Migrated entire backend from Node.js/Express to Python/FastAPI. All API endpoints (Plaid, AI advisor chat with SSE streaming) now served by `server_py/main.py`. The `server/index.ts` acts as a thin launcher that spawns the Python process.
+- **2026-02-06**: Added KeyboardAvoidingView to budget edit/add modals for mobile keyboard support
+- **2026-02-06**: Implemented demo data fallback system with sample accounts, transactions, and budgets
