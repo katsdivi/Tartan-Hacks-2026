@@ -10,6 +10,7 @@ import {
   TextInput,
   Modal,
   Alert,
+  KeyboardAvoidingView,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
@@ -229,7 +230,10 @@ export default function BudgetScreen() {
       </ScrollView>
 
       <Modal visible={showAddModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>New Budget</Text>
@@ -288,12 +292,15 @@ export default function BudgetScreen() {
               <Text style={styles.saveButtonText}>Add Budget</Text>
             </Pressable>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Modal visible={!!editingBudget} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { paddingBottom: 30 }]}>
+        <KeyboardAvoidingView
+          style={[styles.modalOverlay, { justifyContent: "center" }]}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+          <View style={[styles.modalContentCenter, { paddingBottom: 30 }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Edit Limit</Text>
               <Pressable onPress={() => setEditingBudget(null)}>
@@ -318,7 +325,7 @@ export default function BudgetScreen() {
               <Text style={styles.saveButtonText}>Save</Text>
             </Pressable>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -504,6 +511,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.light.border,
     borderBottomWidth: 0,
+  },
+  modalContentCenter: {
+    backgroundColor: Colors.light.surface,
+    borderRadius: 20,
+    padding: 24,
+    marginHorizontal: 24,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
   },
   modalHeader: {
     flexDirection: "row",
