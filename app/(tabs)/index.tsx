@@ -7,7 +7,7 @@ import {
   Pressable,
   RefreshControl,
   Platform,
-  ActivityIndicator,
+  Modal,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
@@ -56,7 +56,7 @@ function MiniChart({ data, prediction }: { data: number[]; prediction: number[] 
     <Svg.Svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
       <Svg.Defs>
         <Svg.LinearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
-          <Svg.Stop offset="0%" stopColor={Colors.light.tint} stopOpacity="0.3" />
+          <Svg.Stop offset="0%" stopColor={Colors.light.tint} stopOpacity="0.25" />
           <Svg.Stop offset="100%" stopColor={Colors.light.tint} stopOpacity="0" />
         </Svg.LinearGradient>
       </Svg.Defs>
@@ -100,9 +100,39 @@ function AccountCard({ account }: { account: any }) {
   );
 }
 
+function ErrorPopup({ message, onDismiss, onDemo }: { message: string; onDismiss: () => void; onDemo: () => void }) {
+  return (
+    <Modal visible transparent animationType="fade">
+      <View style={styles.errorOverlay}>
+        <View style={styles.errorCard}>
+          <Pressable style={styles.errorClose} onPress={onDismiss}>
+            <Ionicons name="close" size={20} color={Colors.light.textSecondary} />
+          </Pressable>
+          <View style={styles.errorIconWrap}>
+            <Ionicons name="alert-circle" size={36} color={Colors.light.negative} />
+          </View>
+          <Text style={styles.errorTitle}>Connection Error</Text>
+          <Text style={styles.errorMessage}>{message}</Text>
+          <View style={styles.errorActions}>
+            <Pressable style={styles.errorDemoBtn} onPress={onDemo}>
+              <Text style={styles.errorDemoBtnText}>Use Demo Data</Text>
+            </Pressable>
+            <Pressable style={styles.errorRetryBtn} onPress={onDismiss}>
+              <Text style={styles.errorRetryBtnText}>Dismiss</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
-  const { isConnected, isLoading, accounts, totalNetWorth, netWorthHistory, transactions, refreshData } = useFinance();
+  const {
+    isConnected, isDemoMode, isLoading, accounts, totalNetWorth, netWorthHistory,
+    transactions, refreshData, connectionError, dismissError, loadDemoData,
+  } = useFinance();
 
   useEffect(() => {
     refreshData();
@@ -138,12 +168,20 @@ export default function DashboardScreen() {
       refreshControl={<RefreshControl refreshing={isLoading} onRefresh={onRefresh} tintColor={Colors.light.tint} />}
       showsVerticalScrollIndicator={false}
     >
+      {connectionError && (
+        <ErrorPopup
+          message={connectionError}
+          onDismiss={dismissError}
+          onDemo={() => { dismissError(); loadDemoData(); }}
+        />
+      )}
+
       <View style={styles.header}>
-        <Text style={styles.greeting}>Your Finances</Text>
+        <Text style={styles.greeting}>Dashboard</Text>
         {isConnected && (
           <View style={styles.connectedBadge}>
-            <View style={styles.greenDot} />
-            <Text style={styles.connectedText}>Connected</Text>
+            <View style={styles.glowDot} />
+            <Text style={styles.connectedText}>{isDemoMode ? "Demo" : "Live"}</Text>
           </View>
         )}
       </View>
@@ -156,18 +194,26 @@ export default function DashboardScreen() {
             end={{ x: 1, y: 1 }}
             style={styles.connectGradient}
           >
-            <Ionicons name="shield-checkmark" size={40} color="#fff" />
+            <Ionicons name="shield-checkmark" size={40} color={Colors.light.background} />
             <Text style={styles.connectTitle}>Connect Your Bank</Text>
             <Text style={styles.connectSubtitle}>
               Link your accounts to track spending, net worth, and get personalized advice.
             </Text>
-            <Pressable
-              style={({ pressed }) => [styles.connectButton, pressed && { opacity: 0.9 }]}
-              onPress={() => router.push("/plaid-link")}
-            >
-              <Text style={styles.connectButtonText}>Connect Account</Text>
-              <Ionicons name="arrow-forward" size={18} color={Colors.light.gradient1} />
-            </Pressable>
+            <View style={styles.connectActions}>
+              <Pressable
+                style={({ pressed }) => [styles.connectButton, pressed && { opacity: 0.9 }]}
+                onPress={() => router.push("/plaid-link")}
+              >
+                <Text style={styles.connectButtonText}>Connect Account</Text>
+                <Ionicons name="arrow-forward" size={18} color={Colors.light.gradient1} />
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [styles.demoButton, pressed && { opacity: 0.7 }]}
+                onPress={loadDemoData}
+              >
+                <Text style={styles.demoButtonText}>Try Demo Data</Text>
+              </Pressable>
+            </View>
           </LinearGradient>
         </View>
       ) : (
@@ -197,7 +243,7 @@ export default function DashboardScreen() {
                   <Text style={styles.legendText}>Actual</Text>
                 </View>
                 <View style={styles.legendItem}>
-                  <View style={[styles.legendLine, { backgroundColor: Colors.light.chartPrediction, borderStyle: "dashed" }]} />
+                  <View style={[styles.legendLine, { backgroundColor: Colors.light.chartPrediction }]} />
                   <Text style={styles.legendText}>Predicted</Text>
                 </View>
               </View>
@@ -206,8 +252,8 @@ export default function DashboardScreen() {
 
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
-              <View style={[styles.statIcon, { backgroundColor: Colors.light.positiveLight }]}>
-                <Ionicons name="wallet" size={18} color={Colors.light.positive} />
+              <View style={[styles.statIcon, { backgroundColor: Colors.light.tintLight }]}>
+                <Ionicons name="wallet" size={18} color={Colors.light.tint} />
               </View>
               <Text style={styles.statValue}>{accounts.length}</Text>
               <Text style={styles.statLabel}>Accounts</Text>
@@ -220,8 +266,8 @@ export default function DashboardScreen() {
               <Text style={styles.statLabel}>7-Day Spend</Text>
             </View>
             <View style={styles.statCard}>
-              <View style={[styles.statIcon, { backgroundColor: Colors.light.accentLight }]}>
-                <Ionicons name="trending-up" size={18} color={Colors.light.accent} />
+              <View style={[styles.statIcon, { backgroundColor: Colors.light.positiveLight }]}>
+                <Ionicons name="trending-up" size={18} color={Colors.light.positive} />
               </View>
               <Text style={styles.statValue}>{changePercent}%</Text>
               <Text style={styles.statLabel}>Growth</Text>
@@ -270,7 +316,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     gap: 5,
   },
-  greenDot: {
+  glowDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
@@ -278,13 +324,15 @@ const styles = StyleSheet.create({
   },
   connectedText: {
     fontSize: 12,
-    fontFamily: "DMSans_500Medium",
+    fontFamily: "DMSans_600SemiBold",
     color: Colors.light.positive,
   },
   connectCard: {
     borderRadius: 20,
     overflow: "hidden",
     marginBottom: 24,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
   },
   connectGradient: {
     padding: 28,
@@ -294,41 +342,53 @@ const styles = StyleSheet.create({
   connectTitle: {
     fontSize: 22,
     fontFamily: "DMSans_700Bold",
-    color: "#fff",
+    color: Colors.light.background,
     marginTop: 4,
   },
   connectSubtitle: {
     fontSize: 14,
     fontFamily: "DMSans_400Regular",
-    color: "rgba(255,255,255,0.85)",
+    color: "rgba(10,14,26,0.7)",
     textAlign: "center",
     lineHeight: 20,
+  },
+  connectActions: {
+    width: "100%",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 8,
   },
   connectButton: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#fff",
+    backgroundColor: Colors.light.background,
     paddingHorizontal: 24,
     paddingVertical: 14,
     borderRadius: 14,
-    marginTop: 8,
     gap: 8,
   },
   connectButtonText: {
     fontSize: 15,
     fontFamily: "DMSans_600SemiBold",
-    color: Colors.light.gradient1,
+    color: Colors.light.tint,
+  },
+  demoButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  demoButtonText: {
+    fontSize: 14,
+    fontFamily: "DMSans_500Medium",
+    color: "rgba(10,14,26,0.6)",
+    textDecorationLine: "underline" as const,
   },
   netWorthCard: {
     backgroundColor: Colors.light.surface,
     borderRadius: 20,
     padding: 24,
     marginBottom: 16,
-    shadowColor: Colors.light.cardShadow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 12,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
   },
   netWorthLabel: {
     fontSize: 13,
@@ -339,7 +399,7 @@ const styles = StyleSheet.create({
   netWorthValue: {
     fontSize: 36,
     fontFamily: "DMSans_700Bold",
-    color: Colors.light.text,
+    color: Colors.light.tint,
     letterSpacing: -1,
   },
   changeRow: {
@@ -393,11 +453,8 @@ const styles = StyleSheet.create({
     padding: 14,
     alignItems: "center",
     gap: 6,
-    shadowColor: Colors.light.cardShadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 8,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
   },
   statIcon: {
     width: 36,
@@ -434,11 +491,8 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 16,
     marginBottom: 10,
-    shadowColor: Colors.light.cardShadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 6,
-    elevation: 1,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
   },
   accountIconWrap: {
     width: 40,
@@ -467,9 +521,87 @@ const styles = StyleSheet.create({
   accountBalance: {
     fontSize: 16,
     fontFamily: "DMSans_700Bold",
-    color: Colors.light.text,
+    color: Colors.light.tint,
   },
   negativeText: {
     color: Colors.light.negative,
+  },
+  errorOverlay: {
+    flex: 1,
+    backgroundColor: Colors.light.overlay,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 32,
+  },
+  errorCard: {
+    backgroundColor: Colors.light.surface,
+    borderRadius: 20,
+    padding: 28,
+    width: "100%",
+    maxWidth: 340,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+  },
+  errorClose: {
+    position: "absolute",
+    top: 14,
+    right: 14,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: Colors.light.surfaceElevated,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  errorIconWrap: {
+    width: 60,
+    height: 60,
+    borderRadius: 18,
+    backgroundColor: Colors.light.negativeLight,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+  errorTitle: {
+    fontSize: 18,
+    fontFamily: "DMSans_700Bold",
+    color: Colors.light.text,
+    marginBottom: 8,
+  },
+  errorMessage: {
+    fontSize: 14,
+    fontFamily: "DMSans_400Regular",
+    color: Colors.light.textSecondary,
+    textAlign: "center",
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  errorActions: {
+    width: "100%",
+    gap: 10,
+  },
+  errorDemoBtn: {
+    backgroundColor: Colors.light.tint,
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  errorDemoBtnText: {
+    fontSize: 15,
+    fontFamily: "DMSans_600SemiBold",
+    color: Colors.light.background,
+  },
+  errorRetryBtn: {
+    borderRadius: 14,
+    paddingVertical: 12,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+  },
+  errorRetryBtnText: {
+    fontSize: 14,
+    fontFamily: "DMSans_500Medium",
+    color: Colors.light.textSecondary,
   },
 });

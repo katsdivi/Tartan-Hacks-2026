@@ -16,28 +16,28 @@ function getCategoryIcon(categories: string[] | null, name: string): { icon: str
   const cat = (categories?.[0] || "").toLowerCase();
   const n = name.toLowerCase();
 
-  if (cat.includes("food") || cat.includes("restaurant") || n.includes("starbucks") || n.includes("mcdonald")) {
-    return { icon: "restaurant", color: "#F59E0B" };
+  if (cat.includes("food") || cat.includes("restaurant") || cat.includes("coffee") || cat.includes("grocer") || n.includes("starbucks") || n.includes("mcdonald") || n.includes("chipotle") || n.includes("whole foods") || n.includes("doordash")) {
+    return { icon: "restaurant", color: Colors.light.neonYellow };
   }
-  if (cat.includes("travel") || cat.includes("taxi") || cat.includes("transport") || n.includes("uber") || n.includes("lyft")) {
-    return { icon: "directions-car", color: "#3B82F6" };
+  if (cat.includes("travel") || cat.includes("taxi") || cat.includes("transport") || cat.includes("gas") || n.includes("uber") || n.includes("lyft") || n.includes("shell")) {
+    return { icon: "directions-car", color: Colors.light.neonBlue };
   }
-  if (cat.includes("shop") || cat.includes("merch") || n.includes("amazon") || n.includes("target")) {
-    return { icon: "shopping-bag", color: "#EC4899" };
+  if (cat.includes("shop") || cat.includes("merch") || cat.includes("department") || cat.includes("marketplace") || n.includes("amazon") || n.includes("target")) {
+    return { icon: "shopping-bag", color: Colors.light.neonPink };
   }
-  if (cat.includes("entertainment") || cat.includes("recreation") || n.includes("netflix") || n.includes("spotify")) {
-    return { icon: "movie", color: "#8B5CF6" };
+  if (cat.includes("entertainment") || cat.includes("recreation") || cat.includes("streaming") || cat.includes("music") || cat.includes("gym") || n.includes("netflix") || n.includes("spotify") || n.includes("planet fitness")) {
+    return { icon: "movie", color: Colors.light.neonPurple };
   }
-  if (cat.includes("transfer") || cat.includes("payment")) {
-    return { icon: "swap-horiz", color: "#6B7280" };
+  if (cat.includes("transfer") || cat.includes("payment") || cat.includes("payroll")) {
+    return { icon: "swap-horiz", color: Colors.light.textSecondary };
   }
-  if (cat.includes("deposit") || cat.includes("income") || cat.includes("payroll")) {
-    return { icon: "attach-money", color: "#10B981" };
+  if (cat.includes("deposit") || cat.includes("income")) {
+    return { icon: "attach-money", color: Colors.light.neonGreen };
   }
   if (cat.includes("utility") || cat.includes("telecom") || cat.includes("service")) {
-    return { icon: "receipt", color: "#0D9488" };
+    return { icon: "receipt", color: Colors.light.tint };
   }
-  return { icon: "receipt-long", color: "#6B7280" };
+  return { icon: "receipt-long", color: Colors.light.textSecondary };
 }
 
 function formatDate(dateStr: string): string {
@@ -120,14 +120,14 @@ export default function TransactionsScreen() {
 
       {isConnected && transactions.length > 0 && (
         <View style={styles.summaryRow}>
-          <View style={[styles.summaryCard, { backgroundColor: Colors.light.negativeLight }]}>
+          <View style={[styles.summaryCard, { borderColor: Colors.light.negative + "40" }]}>
             <Ionicons name="arrow-up" size={14} color={Colors.light.negative} />
             <Text style={[styles.summaryAmount, { color: Colors.light.negative }]}>
               ${totalSpending.toFixed(2)}
             </Text>
             <Text style={styles.summaryLabel}>Spent</Text>
           </View>
-          <View style={[styles.summaryCard, { backgroundColor: Colors.light.positiveLight }]}>
+          <View style={[styles.summaryCard, { borderColor: Colors.light.positive + "40" }]}>
             <Ionicons name="arrow-down" size={14} color={Colors.light.positive} />
             <Text style={[styles.summaryAmount, { color: Colors.light.positive }]}>
               ${totalIncome.toFixed(2)}
@@ -217,6 +217,8 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 14,
     gap: 6,
+    backgroundColor: Colors.light.surface,
+    borderWidth: 1,
   },
   summaryAmount: {
     fontSize: 15,
@@ -238,9 +240,9 @@ const styles = StyleSheet.create({
   dateHeaderText: {
     fontSize: 13,
     fontFamily: "DMSans_600SemiBold",
-    color: Colors.light.textSecondary,
+    color: Colors.light.tint,
     textTransform: "uppercase" as const,
-    letterSpacing: 0.5,
+    letterSpacing: 1,
   },
   txItem: {
     flexDirection: "row",
@@ -249,11 +251,8 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 14,
     marginBottom: 8,
-    shadowColor: Colors.light.cardShadow,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 1,
-    shadowRadius: 4,
-    elevation: 1,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
   },
   txIconWrap: {
     width: 40,
@@ -306,7 +305,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 20,
-    backgroundColor: Colors.light.borderLight,
+    backgroundColor: Colors.light.surfaceElevated,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 4,

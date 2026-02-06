@@ -35,7 +35,7 @@ function BudgetBar({ category }: { category: any }) {
             ${category.spent.toFixed(0)} of ${category.limit.toFixed(0)}
           </Text>
         </View>
-        <View style={styles.budgetPercentWrap}>
+        <View style={[styles.budgetPercentWrap, isOverBudget && { backgroundColor: Colors.light.negativeLight }]}>
           <Text style={[styles.budgetPercent, isOverBudget && { color: Colors.light.negative }]}>
             {percentage}%
           </Text>
@@ -47,7 +47,7 @@ function BudgetBar({ category }: { category: any }) {
             styles.progressBarFill,
             {
               width: `${Math.min(percentage, 100)}%`,
-              backgroundColor: isOverBudget ? Colors.light.negative : percentage > 75 ? Colors.light.accent : category.color,
+              backgroundColor: isOverBudget ? Colors.light.negative : percentage > 75 ? Colors.light.neonYellow : category.color,
             },
           ]}
         />
@@ -74,7 +74,16 @@ const ICON_OPTIONS = [
   { name: "savings", label: "Savings" },
 ];
 
-const COLOR_OPTIONS = ["#F59E0B", "#3B82F6", "#EC4899", "#8B5CF6", "#10B981", "#EF4444", "#0D9488", "#6366F1"];
+const COLOR_OPTIONS = [
+  Colors.light.tint,
+  Colors.light.neonBlue,
+  Colors.light.neonPink,
+  Colors.light.neonPurple,
+  Colors.light.neonGreen,
+  Colors.light.negative,
+  Colors.light.neonYellow,
+  "#FF8C00",
+];
 
 export default function BudgetScreen() {
   const insets = useSafeAreaInsets();
@@ -176,7 +185,9 @@ export default function BudgetScreen() {
         <View style={styles.totalCard}>
           <View style={styles.totalHeader}>
             <Text style={styles.totalLabel}>Total Spending</Text>
-            <Text style={styles.totalPercent}>{Math.round(totalProgress * 100)}%</Text>
+            <Text style={[styles.totalPercent, totalProgress > 0.9 && { color: Colors.light.negative }]}>
+              {Math.round(totalProgress * 100)}%
+            </Text>
           </View>
           <Text style={styles.totalAmount}>
             ${totalSpent.toFixed(0)} <Text style={styles.totalOf}>of ${totalBudget.toFixed(0)}</Text>
@@ -346,6 +357,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.light.tintLight,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1,
+    borderColor: Colors.light.tint + "30",
   },
   scrollView: {
     flex: 1,
@@ -358,11 +371,8 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 20,
     marginBottom: 20,
-    shadowColor: Colors.light.cardShadow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 12,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
   },
   totalHeader: {
     flexDirection: "row",
@@ -378,7 +388,7 @@ const styles = StyleSheet.create({
   totalPercent: {
     fontSize: 14,
     fontFamily: "DMSans_700Bold",
-    color: Colors.light.text,
+    color: Colors.light.tint,
   },
   totalAmount: {
     fontSize: 28,
@@ -406,11 +416,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     marginBottom: 10,
-    shadowColor: Colors.light.cardShadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 6,
-    elevation: 1,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
   },
   budgetHeader: {
     flexDirection: "row",
@@ -443,12 +450,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
-    backgroundColor: Colors.light.borderLight,
+    backgroundColor: Colors.light.surfaceElevated,
   },
   budgetPercent: {
     fontSize: 13,
     fontFamily: "DMSans_700Bold",
-    color: Colors.light.text,
+    color: Colors.light.tint,
   },
   progressBarBg: {
     height: 6,
@@ -494,6 +501,9 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     padding: 24,
     paddingBottom: 40,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    borderBottomWidth: 0,
   },
   modalHeader: {
     flexDirection: "row",
@@ -514,13 +524,15 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   input: {
-    backgroundColor: Colors.light.borderLight,
+    backgroundColor: Colors.light.surfaceElevated,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 16,
     fontFamily: "DMSans_400Regular",
     color: Colors.light.text,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
   },
   iconGrid: {
     flexDirection: "row",
@@ -534,7 +546,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: Colors.light.borderLight,
+    backgroundColor: Colors.light.surfaceElevated,
     borderWidth: 2,
     borderColor: "transparent",
   },
@@ -562,6 +574,6 @@ const styles = StyleSheet.create({
   saveButtonText: {
     fontSize: 16,
     fontFamily: "DMSans_600SemiBold",
-    color: "#fff",
+    color: Colors.light.background,
   },
 });

@@ -6,6 +6,7 @@ import {
   Pressable,
   Platform,
   ActivityIndicator,
+  Modal,
 } from "react-native";
 import { WebView } from "react-native-webview";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -17,10 +18,12 @@ import Colors from "@/constants/colors";
 
 export default function PlaidLinkScreen() {
   const insets = useSafeAreaInsets();
-  const { connectBank } = useFinance();
+  const { connectBank, loadDemoData } = useFinance();
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showErrorPopup, setShowErrorPopup] = useState(false);
+  const [errorDetail, setErrorDetail] = useState("");
   const webViewRef = useRef<WebView>(null);
 
   useEffect(() => {
@@ -33,9 +36,11 @@ export default function PlaidLinkScreen() {
       setError(null);
       const token = await createLinkToken();
       setLinkToken(token);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to create link token:", err);
-      setError("Unable to connect to Plaid. Please try again.");
+      setErrorDetail("Plaid API connection wasn't successful. This could be due to invalid credentials or a service issue.");
+      setShowErrorPopup(true);
+      setError("Connection failed");
     } finally {
       setIsLoading(false);
     }
@@ -49,8 +54,8 @@ export default function PlaidLinkScreen() {
       <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
       <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
       <style>
-        body { margin: 0; padding: 0; background: #F8F9FC; display: flex; align-items: center; justify-content: center; height: 100vh; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
-        .loading { text-align: center; color: #6B7280; }
+        body { margin: 0; padding: 0; background: #0A0E1A; display: flex; align-items: center; justify-content: center; height: 100vh; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+        .loading { text-align: center; color: #8B93A7; }
         .loading p { margin-top: 12px; font-size: 15px; }
       </style>
     </head>
@@ -76,7 +81,6 @@ export default function PlaidLinkScreen() {
             }));
           },
           onEvent: function(eventName, metadata) {
-            // console.log('Plaid event:', eventName);
           },
         });
         handler.open();
@@ -90,10 +94,20 @@ export default function PlaidLinkScreen() {
     try {
       const data = JSON.parse(event.nativeEvent.data);
       if (data.type === "success") {
-        await connectBank(data.public_token);
-        router.back();
+        try {
+          await connectBank(data.public_token);
+          router.back();
+        } catch (err) {
+          setErrorDetail("Plaid API connection wasn't successful. Token exchange failed.");
+          setShowErrorPopup(true);
+        }
       } else if (data.type === "exit") {
-        router.back();
+        if (data.error) {
+          setErrorDetail(`Plaid connection was cancelled or encountered an error: ${data.error.display_message || data.error.error_message || "Unknown error"}`);
+          setShowErrorPopup(true);
+        } else {
+          router.back();
+        }
       }
     } catch (err) {
       console.error("WebView message error:", err);
@@ -122,11 +136,25 @@ export default function PlaidLinkScreen() {
         </View>
       ) : error ? (
         <View style={styles.centerContent}>
-          <Ionicons name="alert-circle" size={48} color={Colors.light.negative} />
-          <Text style={styles.errorText}>{error}</Text>
-          <Pressable style={styles.retryButton} onPress={initPlaidLink}>
-            <Text style={styles.retryButtonText}>Try Again</Text>
-          </Pressable>
+          <View style={styles.errorIconWrap}>
+            <Ionicons name="alert-circle" size={40} color={Colors.light.negative} />
+          </View>
+          <Text style={styles.errorText}>Unable to connect to Plaid</Text>
+          <Text style={styles.errorSubtext}>You can retry or use demo data to explore the app</Text>
+          <View style={styles.errorBtns}>
+            <Pressable style={styles.retryButton} onPress={initPlaidLink}>
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </Pressable>
+            <Pressable
+              style={styles.demoBtnAlt}
+              onPress={() => {
+                loadDemoData();
+                router.back();
+              }}
+            >
+              <Text style={styles.demoBtnAltText}>Use Demo Data</Text>
+            </Pressable>
+          </View>
         </View>
       ) : linkToken ? (
         <WebView
@@ -144,6 +172,42 @@ export default function PlaidLinkScreen() {
           )}
         />
       ) : null}
+
+      <Modal visible={showErrorPopup} transparent animationType="fade">
+        <View style={styles.popupOverlay}>
+          <View style={styles.popupCard}>
+            <Pressable style={styles.popupClose} onPress={() => setShowErrorPopup(false)}>
+              <Ionicons name="close" size={20} color={Colors.light.textSecondary} />
+            </Pressable>
+            <View style={styles.popupIconWrap}>
+              <Ionicons name="alert-circle" size={36} color={Colors.light.negative} />
+            </View>
+            <Text style={styles.popupTitle}>Connection Error</Text>
+            <Text style={styles.popupMessage}>{errorDetail}</Text>
+            <View style={styles.popupActions}>
+              <Pressable
+                style={styles.popupDemoBtn}
+                onPress={() => {
+                  setShowErrorPopup(false);
+                  loadDemoData();
+                  router.back();
+                }}
+              >
+                <Text style={styles.popupDemoBtnText}>Use Demo Data</Text>
+              </Pressable>
+              <Pressable
+                style={styles.popupDismissBtn}
+                onPress={() => {
+                  setShowErrorPopup(false);
+                  router.back();
+                }}
+              >
+                <Text style={styles.popupDismissBtnText}>Dismiss</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -166,6 +230,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
+    backgroundColor: Colors.light.surfaceElevated,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -187,7 +252,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    gap: 16,
+    gap: 12,
     paddingHorizontal: 40,
   },
   loadingText: {
@@ -195,22 +260,133 @@ const styles = StyleSheet.create({
     fontFamily: "DMSans_400Regular",
     color: Colors.light.textSecondary,
   },
+  errorIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: Colors.light.negativeLight,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
   errorText: {
-    fontSize: 15,
+    fontSize: 18,
+    fontFamily: "DMSans_600SemiBold",
+    color: Colors.light.text,
+    textAlign: "center",
+  },
+  errorSubtext: {
+    fontSize: 14,
     fontFamily: "DMSans_400Regular",
     color: Colors.light.textSecondary,
     textAlign: "center",
-    lineHeight: 22,
+    lineHeight: 20,
+  },
+  errorBtns: {
+    gap: 10,
+    marginTop: 8,
+    width: "100%",
+    maxWidth: 240,
   },
   retryButton: {
     backgroundColor: Colors.light.tint,
     borderRadius: 14,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+    paddingVertical: 14,
+    alignItems: "center",
   },
   retryButtonText: {
     fontSize: 15,
     fontFamily: "DMSans_600SemiBold",
-    color: "#fff",
+    color: Colors.light.background,
+  },
+  demoBtnAlt: {
+    borderRadius: 14,
+    paddingVertical: 12,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+  },
+  demoBtnAltText: {
+    fontSize: 14,
+    fontFamily: "DMSans_500Medium",
+    color: Colors.light.textSecondary,
+  },
+  popupOverlay: {
+    flex: 1,
+    backgroundColor: Colors.light.overlay,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 32,
+  },
+  popupCard: {
+    backgroundColor: Colors.light.surface,
+    borderRadius: 20,
+    padding: 28,
+    width: "100%",
+    maxWidth: 340,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+  },
+  popupClose: {
+    position: "absolute",
+    top: 14,
+    right: 14,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: Colors.light.surfaceElevated,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  popupIconWrap: {
+    width: 60,
+    height: 60,
+    borderRadius: 18,
+    backgroundColor: Colors.light.negativeLight,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+  popupTitle: {
+    fontSize: 18,
+    fontFamily: "DMSans_700Bold",
+    color: Colors.light.text,
+    marginBottom: 8,
+  },
+  popupMessage: {
+    fontSize: 14,
+    fontFamily: "DMSans_400Regular",
+    color: Colors.light.textSecondary,
+    textAlign: "center",
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  popupActions: {
+    width: "100%",
+    gap: 10,
+  },
+  popupDemoBtn: {
+    backgroundColor: Colors.light.tint,
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  popupDemoBtnText: {
+    fontSize: 15,
+    fontFamily: "DMSans_600SemiBold",
+    color: Colors.light.background,
+  },
+  popupDismissBtn: {
+    borderRadius: 14,
+    paddingVertical: 12,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+  },
+  popupDismissBtnText: {
+    fontSize: 14,
+    fontFamily: "DMSans_500Medium",
+    color: Colors.light.textSecondary,
   },
 });
