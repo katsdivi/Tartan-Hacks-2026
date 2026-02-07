@@ -25,6 +25,12 @@ export interface Transaction {
   pending: boolean;
   merchant_name: string | null;
   payment_channel: string;
+  location?: {
+    lat: number;
+    lon: number;
+    city?: string;
+    region?: string;
+  };
 }
 
 export interface BudgetCategory {
@@ -127,13 +133,13 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       if (stored) {
         setBudgets(JSON.parse(stored));
       }
-    } catch {}
+    } catch { }
   }, []);
 
   const saveBudgets = useCallback(async (newBudgets: BudgetCategory[]) => {
     try {
       await AsyncStorage.setItem("budgets", JSON.stringify(newBudgets));
-    } catch {}
+    } catch { }
   }, []);
 
   const checkConnection = useCallback(async () => {
@@ -204,52 +210,273 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     setNetWorthHistory(history);
   }, []);
 
+  const DEMO_ACCOUNTS: Account[] = [
+    {
+      account_id: "661f43a9d949ec302e1b1999", // Nessie-like ID
+      name: "Capital One 360 Checking",
+      official_name: "Capital One 360 Checking",
+      type: "depository",
+      subtype: "checking",
+      balances: { available: 5430.50, current: 5430.50, limit: null },
+    },
+    {
+      account_id: "661f43a9d949ec302e1b199a",
+      name: "Capital One 360 Savings",
+      official_name: "Capital One 360 Performance Savings",
+      type: "depository",
+      subtype: "savings",
+      balances: { available: 12500.00, current: 12500.00, limit: null },
+    },
+    {
+      account_id: "661f43a9d949ec302e1b199b",
+      name: "Venture X",
+      official_name: "Capital One Venture X Rewards Credit Card",
+      type: "credit",
+      subtype: "credit card",
+      balances: { available: 15000.00, current: 432.15, limit: 20000.00 },
+    }
+  ];
+
+  const DEMO_TRANSACTIONS: Transaction[] = [
+    // --- Purchases ---
+    {
+      transaction_id: "p1", account_id: "661f43a9d949ec302e1b1999", name: "Whole Foods Market",
+      amount: 145.20, date: new Date().toISOString().split('T')[0],
+      category: ["Food and Drink", "Groceries"], pending: false, merchant_name: "Whole Foods",
+      payment_channel: "in store",
+      location: { lat: 38.9072, lon: -77.0369, city: "Washington", region: "DC" }
+    },
+    {
+      transaction_id: "p2", account_id: "661f43a9d949ec302e1b1999", name: "Uber Ride",
+      amount: 24.50, date: new Date().toISOString().split('T')[0],
+      category: ["Travel", "Taxi"], pending: false, merchant_name: "Uber",
+      payment_channel: "online",
+      location: { lat: 38.8951, lon: -77.0364, city: "Washington", region: "DC" }
+    },
+    {
+      transaction_id: "p3", account_id: "661f43a9d949ec302e1b199b", name: "Netflix Subscription",
+      amount: 15.99, date: new Date(Date.now() - 86400000).toISOString().split('T')[0],
+      category: ["Entertainment", "Streaming"], pending: false, merchant_name: "Netflix",
+      payment_channel: "recurring",
+      location: { lat: 37.2388, lon: -121.9698, city: "Los Gatos", region: "CA" }
+    },
+    {
+      transaction_id: "p4", account_id: "661f43a9d949ec302e1b199b", name: "Apple Store",
+      amount: 999.00, date: new Date(Date.now() - 172800000).toISOString().split('T')[0],
+      category: ["Shopping", "Electronics"], pending: false, merchant_name: "Apple",
+      payment_channel: "in store",
+      location: { lat: 40.7645, lon: -73.9730, city: "New York", region: "NY" }
+    },
+    {
+      transaction_id: "p5", account_id: "661f43a9d949ec302e1b1999", name: "Starbucks",
+      amount: 6.45, date: new Date(Date.now() - 259200000).toISOString().split('T')[0],
+      category: ["Food and Drink", "Coffee Shop"], pending: false, merchant_name: "Starbucks",
+      payment_channel: "in store",
+      location: { lat: 40.7550, lon: -73.9855, city: "New York", region: "NY" }
+    },
+
+    // --- Bills ---
+    {
+      transaction_id: "b1", account_id: "661f43a9d949ec302e1b1999", name: "Verizon Wireless",
+      amount: 85.00, date: new Date(Date.now() - 432000000).toISOString().split('T')[0],
+      category: ["Service", "Phone"], pending: false, merchant_name: "Verizon",
+      payment_channel: "online",
+    },
+    {
+      transaction_id: "b2", account_id: "661f43a9d949ec302e1b1999", name: "Con Edison",
+      amount: 120.50, date: new Date(Date.now() - 604800000).toISOString().split('T')[0],
+      category: ["Service", "Utilities"], pending: false, merchant_name: "Con Edison",
+      payment_channel: "online",
+    },
+
+    // --- Deposits (Negative amount for spending context, or handled as income) ---
+    // In our finance context, positive is spending. So income should optionally be negative? 
+    // Wait, the mapping logic for Nessie deposits was `amount: -p.amount`. 
+    // So for consistency with our mapping logic, a deposit should have a negative amount here.
+    {
+      transaction_id: "d1", account_id: "661f43a9d949ec302e1b1999", name: "Payroll Deposit",
+      amount: -2500.00, date: new Date(Date.now() - 1209600000).toISOString().split('T')[0],
+      category: ["Income", "Wages"], pending: false, merchant_name: "Employer Inc.",
+      payment_channel: "other",
+    },
+
+    // --- Transfers ---
+    {
+      transaction_id: "t1", account_id: "661f43a9d949ec302e1b1999", name: "Transfer to Savings",
+      amount: 500.00, date: new Date(Date.now() - 345600000).toISOString().split('T')[0],
+      category: ["Transfer", "Savings"], pending: false, merchant_name: null,
+      payment_channel: "transfer",
+    },
+    {
+      transaction_id: "t2", account_id: "661f43a9d949ec302e1b199a", name: "Transfer from Checking",
+      amount: -500.00, date: new Date(Date.now() - 345600000).toISOString().split('T')[0],
+      category: ["Transfer", "Savings"], pending: false, merchant_name: null,
+      payment_channel: "transfer",
+    },
+
+    // --- Withdrawals ---
+    {
+      transaction_id: "w1", account_id: "661f43a9d949ec302e1b1999", name: "ATM Withdrawal",
+      amount: 100.00, date: new Date(Date.now() - 864000000).toISOString().split('T')[0],
+      category: ["Transfer", "Cash"], pending: false, merchant_name: "ATM",
+      payment_channel: "atm",
+    }
+  ];
+
   const loadDemoData = useCallback(() => {
-    // This function will now fetch from backend's demo endpoints
-    // No need for client-side dummy data generation anymore
     setIsLoading(true);
-    // Simulate API call for demo data
-    Promise.all([
-      apiRequest("GET", "/api/plaid/accounts").then(res => res.json()),
-      apiRequest("GET", "/api/plaid/transactions").then(res => res.json()),
-    ]).then(([accountsData, transactionsData]) => {
-      const demoAccounts = accountsData.accounts || [];
-      const demoTransactions = transactionsData.transactions || [];
-      setAccounts(demoAccounts);
-      setTransactions(demoTransactions);
-      setIsConnected(true);
-      setIsDemoMode(true);
 
-      const netWorth = demoAccounts.reduce((sum, acc) => {
-        const bal = acc.balances.current || acc.balances.available || 0;
-        if (acc.type === "credit" || acc.type === "loan") return sum - bal;
-        return sum + bal;
-      }, 0);
-      generateNetWorthHistory(netWorth);
+    // Fetch from Nessie API via our backend
+    const fetchData = async () => {
+      try {
+        // 1. Get customers
+        const customersRes = await apiRequest("GET", "/api/capitalone/customers");
+        const customersData = await customersRes.json();
+        const customers = customersData.customers || [];
 
-      const currentBudgets = [...DEFAULT_BUDGETS];
-      const spending: Record<string, number> = {};
-      demoTransactions.forEach((tx) => {
-        if (tx.amount > 0) {
-          const budgetId = categorizeToBudget(tx);
-          if (budgetId) {
-            spending[budgetId] = (spending[budgetId] || 0) + tx.amount;
-          }
-        }
-      });
-      const updated = currentBudgets.map((b) => ({
-        ...b,
-        spent: Math.round((spending[b.id] || 0) * 100) / 100,
-      }));
-      setBudgets(updated);
-      saveBudgets(updated);
-    }).catch(err => {
-      console.error("Failed to load demo data from backend:", err);
-      setConnectionError("Failed to load demo data. Please ensure backend is running.");
-    }).finally(() => {
-      setIsLoading(false);
-    });
-  }, [generateNetWorthHistory, saveBudgets]);
+        if (customers.length === 0) throw new Error("No Capital One customers found.");
+
+        const customerId = customers[0]._id;
+
+        // 2. Get snapshot
+        const snapshotRes = await apiRequest("GET", `/api/capitalone/customer/${customerId}/snapshot`);
+        const snapshot = await snapshotRes.json();
+
+        // 3. Map to internal state
+        // ... (mapping logic remains same, but omitted for brevity in this chunk reuse if possible, but easier to replace whole block for safety) 
+
+        // Since I'm replacing a specific chunk, let me include the mapping logic again to be safe and robust
+
+        const newAccounts: Account[] = [];
+        const newTransactions: Transaction[] = [];
+
+        (snapshot.accounts || []).forEach((item: any) => {
+          const a = item.account;
+          if (!a || a.error) return;
+
+          newAccounts.push({
+            account_id: a._id,
+            name: a.nickname || a.type,
+            official_name: a.nickname,
+            type: a.type,
+            subtype: null,
+            balances: {
+              available: a.balance,
+              current: a.balance,
+              limit: null
+            }
+          });
+
+          // Purchases
+          (item.purchases || []).forEach((p: any) => {
+            if (p.error) return;
+            newTransactions.push({
+              transaction_id: p._id,
+              account_id: a._id,
+              name: p.description || "Purchase",
+              amount: p.amount,
+              date: p.purchase_date,
+              category: ["Purchase"],
+              pending: p.status === 'pending',
+              merchant_name: null,
+              payment_channel: "online"
+            });
+          });
+
+          // Bills
+          (item.bills || []).forEach((p: any) => {
+            if (p.error) return;
+            newTransactions.push({
+              transaction_id: p._id,
+              account_id: a._id,
+              name: "Bill Payment",
+              amount: p.payment_amount,
+              date: p.payment_date,
+              category: ["Bill"],
+              pending: p.status === 'pending',
+              merchant_name: p.payee,
+              payment_channel: "online"
+            });
+          });
+
+          // Deposits
+          (item.deposits || []).forEach((p: any) => {
+            if (p.error) return;
+            newTransactions.push({
+              transaction_id: p._id,
+              account_id: a._id,
+              name: p.description || "Deposit",
+              amount: -p.amount,
+              date: p.transaction_date,
+              category: ["Deposit"],
+              pending: p.status === 'pending',
+              merchant_name: "Deposit",
+              payment_channel: "online"
+            });
+          });
+
+          // Withdrawals
+          (item.withdrawals || []).forEach((p: any) => {
+            if (p.error) return;
+            newTransactions.push({
+              transaction_id: p._id,
+              account_id: a._id,
+              name: "Withdrawal",
+              amount: p.amount,
+              date: p.transaction_date,
+              category: ["Withdrawal"],
+              pending: p.status === 'pending',
+              merchant_name: "Withdrawal",
+              payment_channel: "online"
+            });
+          });
+        });
+
+        setAccounts(newAccounts);
+        setTransactions(newTransactions);
+        setIsConnected(true);
+        setIsDemoMode(true);
+        setConnectionError(null); // Clear error if successful
+
+        // Recalculate derived state
+        const netWorth = newAccounts.reduce((sum, acc) => {
+          const bal = acc.balances.current || acc.balances.available || 0;
+          if (acc.type === "credit" || acc.type === "loan") return sum - bal;
+          return sum + bal;
+        }, 0);
+        generateNetWorthHistory(netWorth);
+
+        const currentBudgets = [...DEFAULT_BUDGETS];
+        updateBudgetSpending(newTransactions, currentBudgets);
+
+      } catch (e) {
+        console.warn("Failed to load Nessie data, falling back to static demo data:", e);
+        // Fallback to static demo data
+        setAccounts(DEMO_ACCOUNTS);
+        setTransactions(DEMO_TRANSACTIONS);
+        setIsConnected(true);
+        setIsDemoMode(true);
+        // Optionally show a non-blocking toast or just log it
+        setConnectionError("Using demo data (Capital One API unavailable)");
+
+        const netWorth = DEMO_ACCOUNTS.reduce((sum, acc) => {
+          const bal = acc.balances.current || acc.balances.available || 0;
+          if (acc.type === "credit" || acc.type === "loan") return sum - bal;
+          return sum + bal;
+        }, 0);
+        generateNetWorthHistory(netWorth);
+        updateBudgetSpending(DEMO_TRANSACTIONS, [...DEFAULT_BUDGETS]);
+
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+
+
+
+  }, [generateNetWorthHistory, updateBudgetSpending]); // Removed saveBudgets dep to updateBudgetSpending handles saving
 
   const refreshData = useCallback(async () => {
     setIsLoading(true);
@@ -313,7 +540,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       setTransactions([]);
       setNetWorthHistory([]);
       setBudgets(DEFAULT_BUDGETS);
-    } catch {}
+    } catch { }
   }, [isDemoMode]);
 
   const updateBudget = useCallback(async (id: string, updates: Partial<BudgetCategory>) => {
@@ -355,19 +582,17 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       context += `\nRecent Spending (7 days): $${totalSpending.toFixed(2)}\n`;
       context += `Number of transactions: ${transactions.length}\n`;
 
-      const topCategories: Record<string, number> = {};
-      transactions.forEach((t) => {
-        if (t.amount > 0 && t.category?.[0]) {
-          topCategories[t.category[0]] = (topCategories[t.category[0]] || 0) + t.amount;
-        }
+      // Add detailed transaction list (last 15)
+      context += "\nRecent Transactions:\n";
+      const recentTxns = [...transactions]
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .slice(0, 15);
+
+      recentTxns.forEach((t) => {
+        const loc = t.location ? ` (${t.location.city || ""}, ${t.location.region || ""})` : "";
+        const cat = t.category ? ` [${t.category.join(", ")}]` : "";
+        context += `- ${t.date}: ${t.name || t.merchant_name} $${t.amount.toFixed(2)}${cat}${loc}\n`;
       });
-      const sorted = Object.entries(topCategories).sort((a, b) => b[1] - a[1]).slice(0, 5);
-      if (sorted.length > 0) {
-        context += "\nTop spending categories:\n";
-        sorted.forEach(([cat, amount]) => {
-          context += `- ${cat}: $${amount.toFixed(2)}\n`;
-        });
-      }
     }
 
     if (budgets.length > 0) {

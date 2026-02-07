@@ -11,7 +11,11 @@ from datetime import date, timedelta
 
 
 
+
+from nessie_client import NessieClient
+from chat import ChatService
 from fastapi import FastAPI, Request, Response
+
 
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 
@@ -467,6 +471,95 @@ assets_path = Path(__file__).parent.parent / "assets"
 if assets_path.exists():
     app.mount("/assets", StaticFiles(directory=str(assets_path)), name="assets")
 
+
+# --- CAPITIAL ONE NESSIE INTEGRATION ---
+
+nessie_client = NessieClient()
+
+@app.get("/api/capitalone/customers")
+async def get_customers():
+    try:
+        customers = await nessie_client.get_customers()
+        return {"customers": customers}
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=502)
+
+@app.get("/api/capitalone/customer/{customer_id}/snapshot")
+async def customer_snapshot(customer_id: str):
+    try:
+        # 1. Get all accounts for the customer
+        accounts = await nessie_client.get_customer_accounts(customer_id)
+
+        # 2. Hydrate each account with details in parallel
+        async def hydrate_account(a):
+            aid = a.get("_id") or a.get("id") or a.get("account_id")
+            if not aid:
+                return {"raw": a, "error": "missing_account_id"}
+
+            # Gather all related data for this account
+            account, customer, bills, deposits, loans, purchases, transfers, withdrawals = await asyncio.gather(
+                nessie_client.get_account(aid),
+                nessie_client.get_account_customer(aid),
+                nessie_client.get_account_bills(aid),
+                nessie_client.get_account_deposits(aid),
+                nessie_client.get_account_loans(aid),
+                nessie_client.get_account_purchases(aid),
+                nessie_client.get_account_transfers(aid),
+                nessie_client.get_account_withdrawals(aid),
+                return_exceptions=True # Continue even if some sub-requests fail
+            )
+
+            # Helper to handle exceptions in gather results
+            def clean_result(res):
+                return res if not isinstance(res, Exception) else {"error": str(res)}
+
+            return {
+                "account": clean_result(account),
+                "customer": clean_result(customer),
+                "bills": clean_result(bills),
+                "deposits": clean_result(deposits),
+                "loans": clean_result(loans),
+                "purchases": clean_result(purchases),
+                "transfers": clean_result(transfers),
+                "withdrawals": clean_result(withdrawals),
+            }
+
+        hydrated_accounts = await asyncio.gather(*(hydrate_account(a) for a in accounts))
+
+        return {"customer_id": customer_id, "accounts": hydrated_accounts}
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JSONResponse({"error": f"Nessie error: {str(e)}"}, status_code=502)
+
+# --- END CAPITAL ONE NESSIE INTEGRATION ---
+
+# --- CHAT INTEGRATION ---
+chat_service = ChatService()
+
+@app.post("/api/advisor/chat")
+async def advisor_chat(request: Request):
+    try:
+        body = await request.json()
+        messages = body.get("messages", [])
+        financial_context = body.get("financialContext", "")
+        
+        async def event_generator():
+            try:
+                async for chunk in chat_service.get_response_stream(messages, financial_context):
+                    yield f"data: {json.dumps({'choices': [{'delta': {'content': chunk}}]})}\n\n"
+                yield "data: [DONE]\n\n"
+            except Exception as e:
+                print(f"Stream error: {e}")
+                error_msg = json.dumps({"error": str(e)})
+                yield f"data: {error_msg}\n\n"
+
+        return StreamingResponse(event_generator(), media_type="text/event-stream")
+    except Exception as e:
+        print(f"Chat endpoint error: {e}")
+        return JSONResponse({"error": str(e)}, status_code=500)
+# --- END CHAT INTEGRATION ---
 
 if __name__ == "__main__":
     import uvicorn

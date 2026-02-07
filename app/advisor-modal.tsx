@@ -144,62 +144,26 @@ export default function AdvisorModalScreen() {
     setShowTyping(true);
 
     try {
-      const DEDALUS_API_KEY = process.env.EXPO_PUBLIC_DEDALUS_API_KEY;
-      if (!DEDALUS_API_KEY) {
-        throw new Error("DEDALUS_API_KEY is not set in environment variables.");
-      }
-
-      const DEDALUS_API_URL = "https://api.dedaluslabs.ai/v1/chat/completions";
-
       const financialContext = getFinancialContext();
-      const system_prompt = `You are Origin, a professional AI financial advisor. You provide personalized, actionable financial guidance.
 
-${financialContext ? `Here is the user's current financial data:\n${financialContext}\n\nUse this data to provide specific, personalized advice.` : "The user hasn't connected their bank account yet. Encourage them to connect it for personalized advice, but still provide general financial guidance."}
+      // Use the local backend endpoint which handles routing and keys
+      const API_URL = `${getApiUrl()}/api/advisor/chat`;
 
-Guidelines:
-- Be concise but thorough
-- Give specific, actionable recommendations
-- Use numbers and percentages when relevant
-- Be encouraging but realistic
-- Format responses with clear structure
-- Never provide specific investment advice or stock picks
-- Focus on budgeting, saving, debt management, and financial planning`;
-
-
-      // Convert messages to OpenAI-compatible format for Dedalus Labs
-      const dedalusMessages = [
-        { role: 'system', content: system_prompt }
-      ];
-
-      // Append existing chat history
-      for (const message of currentMessages) {
-        dedalusMessages.push({
-          role: message.role,
-          content: message.content
-        });
-      }
-      // Add the current user message
-      dedalusMessages.push({ role: 'user', content: messageText });
-
-
-      const response = await fetch(DEDALUS_API_URL, {
+      const response = await fetch(API_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${DEDALUS_API_KEY}`,
         },
         body: JSON.stringify({
-          model: "openai/gpt-4o-mini",
-          messages: dedalusMessages,
-          stream: true,
-          temperature: 0.7,
+          messages: [...currentMessages, userMessage],
+          financialContext: financialContext,
         }),
       });
 
       if (!response.ok) {
         const errorBody = await response.text();
-        console.error("Dedalus API error response:", errorBody);
-        throw new Error(`Dedalus API returned an error: ${response.status} ${response.statusText}`);
+        console.error("Advisor API error response:", errorBody);
+        throw new Error(`Advisor API returned an error: ${response.status} ${response.statusText}`);
       }
 
       const reader = response.body?.getReader();
@@ -215,16 +179,15 @@ Guidelines:
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-        // Dedalus API uses Server-Sent Events format with "data: " prefix
         const lines = buffer.split('\n');
-        buffer = lines.pop() || ''; // Keep the incomplete line in buffer
+        buffer = lines.pop() || '';
 
         for (const line of lines) {
           const trimmedLine = line.trim();
           if (!trimmedLine || !trimmedLine.startsWith('data: ')) continue;
 
-          const data = trimmedLine.substring(6); // Remove "data: " prefix
-          if (data === '[DONE]') continue; // Stream finished signal
+          const data = trimmedLine.substring(6);
+          if (data === '[DONE]') continue;
 
           try {
             const parsed = JSON.parse(data);
@@ -252,18 +215,21 @@ Guidelines:
                   return updated;
                 });
               }
+            } else if (parsed.error) {
+              console.error("Stream error message:", parsed.error);
             }
           } catch (e) {
-            console.error("Error parsing Dedalus stream chunk:", e, data);
+            console.error("Error parsing stream chunk:", e, data);
           }
         }
       }
     } catch (error) {
+      console.error("Chat Error:", error);
       setShowTyping(false);
       setMessages((prev) => [...prev, {
         id: generateUniqueId(),
         role: "assistant",
-        content: "I'm having trouble connecting right now. Please try again.",
+        content: "I'm having trouble connecting right now. Please try again later.",
       }]);
     } finally {
       setIsStreaming(false);
