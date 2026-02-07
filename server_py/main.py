@@ -4,47 +4,78 @@ import asyncio
 from datetime import datetime, timedelta
 from pathlib import Path
 
+import google.generativeai as genai
+
+
+
 from fastapi import FastAPI, Request, Response
+
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+
 from fastapi.staticfiles import StaticFiles
+
 from fastapi.middleware.cors import CORSMiddleware
+
 from starlette.middleware.base import BaseHTTPMiddleware
 
+
+
 import plaid
+
 from plaid.api import plaid_api
+
 from plaid.model.link_token_create_request import LinkTokenCreateRequest
+
 from plaid.model.link_token_create_request_user import LinkTokenCreateRequestUser
+
 from plaid.model.item_public_token_exchange_request import ItemPublicTokenExchangeRequest
+
 from plaid.model.accounts_get_request import AccountsGetRequest
+
 from plaid.model.accounts_balance_get_request import AccountsBalanceGetRequest
+
 from plaid.model.transactions_get_request import TransactionsGetRequest
+
 from plaid.model.transactions_get_request_options import TransactionsGetRequestOptions
+
 from plaid.model.products import Products
+
 from plaid.model.country_code import CountryCode
 
-from openai import AsyncOpenAI
+
 
 app = FastAPI()
 
+
+
 PLAID_CLIENT_ID = os.environ.get("PLAID_CLIENT_ID", "")
+
 PLAID_SECRET = os.environ.get("PLAID_SECRET", "")
-OPENAI_API_KEY = os.environ.get("AI_INTEGRATIONS_OPENAI_API_KEY", "")
-OPENAI_BASE_URL = os.environ.get("AI_INTEGRATIONS_OPENAI_BASE_URL", "")
+
+genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+
+
 
 configuration = plaid.Configuration(
+
     host=plaid.Environment.Sandbox,
+
     api_key={
+
         "clientId": PLAID_CLIENT_ID,
+
         "secret": PLAID_SECRET,
+
     },
+
 )
+
 api_client = plaid.ApiClient(configuration)
+
 plaid_client = plaid_api.PlaidApi(api_client)
 
-openai_client = AsyncOpenAI(
-    api_key=OPENAI_API_KEY,
-    base_url=OPENAI_BASE_URL,
-)
+
+
 
 stored_access_token: str | None = None
 stored_item_id: str | None = None
@@ -320,19 +351,27 @@ Guidelines:
 - Never provide specific investment advice or stock picks
 - Focus on budgeting, saving, debt management, and financial planning"""
 
+        model = genai.GenerativeModel('gemini-flash')
+
         async def generate():
             try:
-                stream = await openai_client.chat.completions.create(
-                    model="gpt-5.2",
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        *messages,
-                    ],
+                # The Gemini API uses a different message format than OpenAI,
+                # so we need to convert the messages.
+                gemini_messages = []
+                for message in messages:
+                    role = 'user' if message['role'] == 'user' else 'model'
+                    gemini_messages.append({'role': role, 'parts': [message['content']]})
+                
+                # Add the system prompt as the first message
+                gemini_messages.insert(0, {'role': 'user', 'parts': [system_prompt]})
+
+
+                stream = await model.generate_content(
+                    gemini_messages,
                     stream=True,
-                    max_completion_tokens=2048,
                 )
                 async for chunk in stream:
-                    content = chunk.choices[0].delta.content if chunk.choices and chunk.choices[0].delta.content else ""
+                    content = chunk.text if hasattr(chunk, 'text') and chunk.text else ""
                     if content:
                         yield f"data: {json.dumps({'content': content})}\n\n"
                 yield "data: [DONE]\n\n"

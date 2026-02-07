@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Origin",
-    "slug": "origin-finance",
+    "name": "Pigeon",
+    "slug": "pigeon",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "myapp",
+    "scheme": "pigeon",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -15,10 +15,10 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.myapp"
+      "bundleIdentifier": "com.pigeon.app"
     },
     "android": {
-      "package": "com.myapp",
+      "package": "com.pigeon.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
