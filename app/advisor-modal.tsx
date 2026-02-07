@@ -8,8 +8,8 @@ import {
   Pressable,
   Platform,
   ActivityIndicator,
+  KeyboardAvoidingView,
 } from "react-native";
-import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { fetch } from "expo/fetch";
@@ -65,27 +65,39 @@ function MessageBubble({ message }: { message: Message }) {
               bullet_list: { marginTop: 4, marginBottom: 4 },
               ordered_list: { marginTop: 4, marginBottom: 4 },
               list_item: { marginTop: 2, marginBottom: 2 },
+              blockquote: {
+                backgroundColor: Colors.light.surfaceElevated,
+                borderLeftWidth: 4,
+                borderLeftColor: Colors.light.tint,
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                marginTop: 4,
+                marginBottom: 8,
+                borderRadius: 4,
+              },
               code_inline: {
-                backgroundColor: Colors.light.borderLight,
+                backgroundColor: "rgba(0,0,0,0.05)",
                 color: Colors.light.tint,
                 paddingHorizontal: 4,
-                paddingVertical: 2,
+                paddingVertical: 1,
                 borderRadius: 4,
                 fontFamily: "Courier",
               },
               code_block: {
-                backgroundColor: Colors.light.borderLight,
-                padding: 8,
-                borderRadius: 6,
-                marginTop: 4,
-                marginBottom: 4,
+                backgroundColor: "rgba(0,0,0,0.05)",
+                padding: 10,
+                borderRadius: 8,
+                marginTop: 6,
+                marginBottom: 6,
+                fontFamily: "Courier",
               },
               fence: {
-                backgroundColor: Colors.light.borderLight,
-                padding: 8,
-                borderRadius: 6,
-                marginTop: 4,
-                marginBottom: 4,
+                backgroundColor: "rgba(0,0,0,0.05)",
+                padding: 10,
+                borderRadius: 8,
+                marginTop: 6,
+                marginBottom: 6,
+                fontFamily: "Courier",
               },
             }}
           >
@@ -246,8 +258,8 @@ export default function AdvisorModalScreen() {
   return (
     <KeyboardAvoidingView
       style={[styles.container, { paddingTop: topInset }]}
-      behavior="padding"
-      keyboardVerticalOffset={0}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 100 : 0}
     >
       <View style={styles.headerSection}>
         <Pressable
@@ -304,6 +316,7 @@ export default function AdvisorModalScreen() {
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.messagesList}
           showsVerticalScrollIndicator={false}
+          style={{ flex: 1 }}
         />
       )}
 

@@ -181,14 +181,24 @@ class PurchasePredictorService:
         # Transform danger zones to match frontend expectations
         transformed_zones = []
         for zone in self.danger_zones:
+            merchant = zone.get("merchant", "Unknown")
+            # Mock address based on merchant for demo purposes
+            address = f"Near {merchant}"
+            if "Starbucks" in merchant:
+                address = "123 Main St, New York, NY"
+            elif "Target" in merchant:
+                address = "456 Broadway, New York, NY"
+                
             transformed_zones.append({
                 "id": zone.get("merchant", "unknown"),
-                "merchant_name": zone.get("merchant", "Unknown"),
+                "merchant_name": merchant,
                 "lat": zone.get("lat", 0.0),
                 "lng": zone.get("lng", 0.0),
-                "radius": 50.0,  # Default 50m radius
+                "radius": 50.0,
                 "merchant_category": zone.get("category", "Food and Drink"),
-                "avg_regret_score": zone.get("regret_count", 0) / 100.0  # Normalize to 0-1
+                "regret_count": zone.get("regret_count", 5), # Default to 5 if missing
+                "avg_regret_score": zone.get("regret_score", 0.8),
+                "address": address
             })
         
         # Add requested global danger zone
@@ -197,9 +207,11 @@ class PurchasePredictorService:
             "merchant_name": "Area 69",
             "lat": 69.69,
             "lng": 42.00,
-            "radius": 500.0,  # Larger radius to make it easier to hit
+            "radius": 500.0,
             "merchant_category": "Restricted Area",
-            "avg_regret_score": 1.0  # Max regret
+            "regret_count": 99,
+            "avg_regret_score": 1.0,  # Max regret
+            "address": "Restricted Airspace, NV"
         })
         
         return transformed_zones

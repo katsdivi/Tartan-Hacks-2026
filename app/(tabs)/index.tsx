@@ -18,8 +18,6 @@ import { useFinance } from "@/lib/finance-context";
 import Colors from "@/constants/colors";
 import FinanceTip from "@/components/FinanceTip";
 import { AnalyticsBlock } from "@/components/AnalyticsBlock";
-import { DangerZoneAlert } from "@/components/DangerZoneAlert";
-import { PurchaseNudge } from "@/components/PurchaseNudge";
 
 const DEMO_MODE_ENV = process.env.EXPO_PUBLIC_DEMO_MODE === "1";
 
@@ -424,8 +422,6 @@ export default function DashboardScreen() {
 
           <AnalyticsBlock />
 
-          <PurchaseNudge />
-          <DangerZoneAlert />
 
           <SpendingOverview transactions={transactions} />
           <BudgetProgress budgets={budgets} />

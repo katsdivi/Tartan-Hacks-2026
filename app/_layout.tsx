@@ -32,12 +32,16 @@ export default function RootLayout() {
 
   useEffect(() => {
     // Prevent the splash screen from auto-hiding until fonts are loaded
-    SplashScreen.preventAutoHideAsync();
+    SplashScreen.preventAutoHideAsync().catch(() => {
+      /* reloading the app might trigger some race conditions, ignore them */
+    });
   }, []);
 
   useEffect(() => {
     if (fontsLoaded) {
-      SplashScreen.hideAsync();
+      SplashScreen.hideAsync().catch(() => {
+        /* ignore error */
+      });
     }
   }, [fontsLoaded]);
 

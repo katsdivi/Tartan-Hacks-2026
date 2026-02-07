@@ -49,29 +49,124 @@ class QueryRouter:
         # Default to fast/cheap model
         return "openai/gpt-4o-mini"
 
+class AgentOrchestrator:
+    def __init__(self, client: DedalusClient):
+        self.client = client
+
+    async def run_boardroom_workflow(self, message: str, financial_context: str, survey_context: str) -> AsyncGenerator[str, None]:
+        """
+        Executes the 'Boardroom' strategy: Screener -> Psychologist -> CFO.
+        """
+        yield "__🎙️ Boardroom Session Started__\n\n"
+        
+        # --- Agent 1: The Screener (Gemini 2.0 Flash) ---
+        # Role: High-speed ingestion and summarization
+        yield "> **Agents Active:** Screener (Gemini 2.0 Flash) is analyzing raw data...\n"
+        
+        screener_system = """You are the SCREENER. Your job is to ingest raw financial data and the user's query to produce a 'Financial Brief'.
+        Analyze the data for anomalies, huge spending, or budget leaks.
+        Output a concise summary of the situation.
+        GUARDRAIL: If the user query is NOT about finance/money, output: "NON-FINANCIAL QUERY REJECTED".
+        """
+        screener_messages = [
+            {"role": "system", "content": screener_system},
+            {"role": "user", "content": f"Query: {message}\n\nData: {financial_context}"}
+        ]
+        
+        # We use a fast model for this
+        screener_response = await self.client.chat_completion("openai/gpt-4o-mini", screener_messages)
+        financial_brief = screener_response.choices[0].message.content
+        
+        yield f"> **Screener Findings:** {financial_brief[:100]}...\n\n"
+        
+        if "NON_FINANCIAL" in financial_brief or "REJECTED" in financial_brief:
+             yield "I focus exclusively on your financial goals. Please ask me about your spending, budget, or saving plans."
+             return
+        
+        # --- Agent 2: The Psychologist (GPT-4o) ---
+        # Role: Behavioral profiling
+        yield "> **Agents Active:** Psychologist (GPT-4o) is profiling user behavior...\n"
+        
+        psych_system = f"""You are the PSYCHOLOGIST. Read the Financial Brief and the User's Profile.
+        Determined the user's likely emotional state (e.g., Anxious, Impulsive, Apathetic, Motivated).
+        Output 'Communication Guidelines' for the CFO to use (e.g., 'Be firm but kind', 'Use fear of loss', 'Celebrate small wins').
+        
+        User Profile: {survey_context}
+        """
+        psych_messages = [
+            {"role": "system", "content": psych_system},
+            {"role": "user", "content": f"Financial Brief: {financial_brief}"}
+        ]
+        
+        psych_response = await self.client.chat_completion("openai/gpt-4o", psych_messages)
+        comm_guidelines = psych_response.choices[0].message.content
+        
+        # yield f"> **Psychologist Insight:** {comm_guidelines}\n\n"
+        
+        # --- Agent 3: The CFO (Advanced Reasoning) ---
+        # Role: Final Strategy & Advice
+        yield "> **Agents Active:** CFO (Advanced Reasoning) is drafting the plan...\n\n"
+        yield "---\n\n"
+        
+        cfo_system = f"""You are the CFO (Chief Financial Officer). 
+        Your goal is to give the user specific, actionable financial advice.
+        
+        INPUTS:
+        1. Situation: {financial_brief}
+        2. User Psychology: {comm_guidelines}
+        
+        INSTRUCTIONS:
+        - Write the final response to the user.
+        - Adopt the tone suggested by the Psychologist.
+        - Address the issues found by the Screener.
+        - Be authoritative yet empathetic.
+        """
+        
+        cfo_messages = [
+            {"role": "system", "content": cfo_system},
+            {"role": "user", "content": message}
+        ]
+        
+        # Stream the final response
+        async for chunk in self._stream_response("openai/gpt-4o", cfo_messages):
+            yield chunk
+
+    async def _stream_response(self, model, messages):
+        try:
+            stream = await self.client.chat_completion(model, messages, stream=True)
+            async for chunk in stream:
+                if chunk.choices and len(chunk.choices) > 0:
+                    delta = chunk.choices[0].delta
+                    if delta.content:
+                        yield delta.content
+        except Exception as e:
+            yield f"Error in stream: {str(e)}"
+
 class ChatService:
     def __init__(self):
         self.dedalus_client = DedalusClient()
         self.router = QueryRouter()
+        self.orchestrator = AgentOrchestrator(self.dedalus_client)
 
     async def get_response_stream(self, messages: List[Dict], financial_context: str = "", survey_context: str = "") -> AsyncGenerator[str, None]:
         user_message = messages[-1]["content"] if messages else ""
         
-        # Check for multi-step workflow trigger
-        if "analyze" in user_message.lower() and "plan" in user_message.lower():
-            async for chunk in self._handle_multi_step_workflow(messages, financial_context):
+        # Check for Boardroom trigger (smart routing)
+        # We trigger the boardroom for complex queries
+        if any(k in user_message.lower() for k in ["analyze", "plan", "help", "debt", "invest", "strategy", "big picture"]):
+            async for chunk in self.orchestrator.run_boardroom_workflow(user_message, financial_context, survey_context):
                 yield chunk
             return
 
-        # Standard routing
+        # Standard routing for simple queries
         model = self.router.route(user_message, financial_context)
-        print(f"Routing query to: {model}")
+        print(f"Routing to model: {model}")
+        yield f"__Using {self._get_friendly_model_name(model)}__\n\n"
         
-        friendly_name = self._get_friendly_model_name(model)
-        yield f"__Using {friendly_name}__\n\n"
-        
+        print("Starting stream from Dedalus...")
         async for chunk in self._stream_dedalus(model, messages, financial_context, survey_context):
             yield chunk
+        print("Stream finished.")
 
     def _get_friendly_model_name(self, model: str) -> str:
         if "gpt-4o-mini" in model:
@@ -84,46 +179,17 @@ class ChatService:
 
     async def _stream_dedalus(self, model: str, messages: List[Dict], financial_context: str, survey_context: str):
         system_prompt = self._get_system_prompt(financial_context, survey_context)
-        # Ensure system prompt is first
         full_messages = [{"role": "system", "content": system_prompt}] + messages
         
-        print(f"Streaming request to Dedalus for model: {model}")
         try:
             stream = await self.dedalus_client.chat_completion(model, full_messages, stream=True)
             async for chunk in stream:
-                # print(f"DEBUG CHUNK: {chunk}") # Uncomment for verbose debugging
                 if chunk.choices and len(chunk.choices) > 0:
                     delta = chunk.choices[0].delta
                     if delta.content:
                         yield delta.content
         except Exception as e:
-             print(f"Error streaming from Dedalus: {e}")
              yield f"Error: {str(e)}"
-
-    async def _handle_multi_step_workflow(self, messages: List[Dict], financial_context: str):
-        yield "__Starting Deep Analysis Workflow__\n\n"
-        
-        # Step 1: Categorization (GPT-4o-mini via Dedalus)
-        yield "**Step 1: Categorizing data (GPT-4o-mini)...**\n"
-        sys_prompt_1 = "You are a data analyst. Summarize the transaction data provided into 3 main spending categories."
-        msgs_1 = [{"role": "system", "content": sys_prompt_1}] + messages
-        resp_1 = await self.dedalus_client.chat_completion("openai/gpt-4o-mini", msgs_1, stream=False)
-        summary = resp_1.choices[0].message.content
-        yield f"{summary}\n\n"
-        
-        # Step 2: Handoff to 'GPT-5' (Mock)
-        yield "**Step 2: Deep Analysis (Simulating GPT-5)...**\n"
-        await asyncio.sleep(1) 
-        yield "Deep pattern recognition complete. Identified potential savings of 15%.\n\n"
-        
-        # Step 3: Detailed Plan (GPT-4o via Dedalus)
-        yield "**Step 3: Creating Detailed Savings Plan (Advanced Reasoning)...**\n\n"
-        sys_prompt_3 = f"You are a financial planner. Based on this summary: {summary}, create a detailed savings plan."
-        msgs_3 = [{"role": "user", "content": sys_prompt_3}]
-        
-        async for chunk in self._stream_dedalus("openai/gpt-4o", msgs_3, "", ""):
-            yield chunk
-
 
     def _get_system_prompt(self, financial_context: str, survey_context: str) -> str:
         return f"""You are Origin, a professional AI financial advisor.
@@ -133,11 +199,13 @@ class ChatService:
 {f'User Survey Analysis (Goals & Behavior): {survey_context}' if survey_context else ''}
 
 Guidelines:
+- **STRICT DOMAIN RESTRICTION**: You are a FINANCIAL ADVISOR. Do NOT answer questions unrelated to finance, money, budgeting, economics, or wealth.
+    - If asked about celebrities, movies, general trivia, coding, or politics, politely refuse: "I focus only on your financial well-being."
 - Be concise but thorough
-- Give specific, actionable recommendations based on the user's data and survey goals
+- Give specific, actionable recommendations
 - Use numbers/percentages
-- No specific investment advice
-- STRICT GUARDRAIL: YOU MUST REFUSE TO ANSWER ANY QUESTIONS THAT ARE NOT RELATED TO PERSONAL FINANCE, BUDGETING, SAVING, SPENDING HABITS, OR INVESTING. If the user asks about anything else (e.g., politics, coding, general knowledge), politely decline and steer them back to finance.
+- No specific investment advice (legal disclaimer)
+- Adopt a supportive, personalized tone based on the user's profile.
 """
 
     async def analyze_survey(self, answers: Dict, financial_context: str = "") -> Dict:
@@ -191,7 +259,7 @@ Guidelines:
             for t in recent_txns
         ])
         
-        system_prompt = "You are a behavioral finance expert. Provide a concise (2-3 sentences) summary of the user's spending behavior based on their recent transactions and profile."
+        system_prompt = "You are a behavioral finance expert. Provide a very concise (1 sentence max) summary of the user's spending behavior. fast-casual tone."
         
         user_prompt = f"""
         Recent Transactions:

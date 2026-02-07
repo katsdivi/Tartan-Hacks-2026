@@ -15,6 +15,7 @@ export interface DangerZone {
   lng: number;
   regret_count: number;
   distance_km?: number;
+  address?: string;
 }
 
 export interface PurchasePrediction {

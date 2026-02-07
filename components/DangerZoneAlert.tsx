@@ -15,6 +15,7 @@ import { useFinance } from "@/lib/finance-context";
 
 export function DangerZoneAlert() {
   const { dangerZones } = useFinance();
+  const [expanded, setExpanded] = React.useState(false);
 
   if (dangerZones.length === 0) return null;
 
@@ -22,45 +23,52 @@ export function DangerZoneAlert() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.iconWrap}>
-          <Ionicons name="warning" size={20} color={Colors.light.neonYellow} />
-        </View>
-        <View style={styles.headerText}>
-          <Text style={styles.title}>Spending Danger Zones</Text>
-          <Text style={styles.subtitle}>
-            {dangerZones.length} location{dangerZones.length !== 1 ? "s" : ""} flagged
-            {" "}({totalRegrets} total regrets)
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.zoneList}>
-        {dangerZones.map((zone, index) => (
-          <View key={`${zone.merchant}-${index}`} style={styles.zoneItem}>
-            <View style={styles.zoneIcon}>
-              <MaterialIcons name="location-on" size={16} color={Colors.light.negative} />
-            </View>
-            <View style={styles.zoneInfo}>
-              <Text style={styles.zoneName}>{zone.merchant}</Text>
-              <Text style={styles.zoneCoords}>
-                {zone.lat.toFixed(3)}, {zone.lng.toFixed(3)}
-              </Text>
-            </View>
-            <View style={styles.regretBadge}>
-              <Text style={styles.regretCount}>{zone.regret_count}</Text>
-              <Text style={styles.regretLabel}>regrets</Text>
-            </View>
+      <Pressable onPress={() => setExpanded(!expanded)} style={styles.header}>
+        <View style={styles.headerLeft}>
+          <View style={styles.iconWrap}>
+            <Ionicons name="warning" size={20} color={Colors.light.neonYellow} />
           </View>
-        ))}
-      </View>
+          <View style={styles.headerText}>
+            <Text style={styles.title}>Spending Danger Zones</Text>
+            <Text style={styles.subtitle}>
+              {dangerZones.length} location{dangerZones.length !== 1 ? "s" : ""} flagged
+              {" "}({totalRegrets} total regrets)
+            </Text>
+          </View>
+        </View>
+        <Ionicons name={expanded ? "chevron-up" : "chevron-down"} size={20} color="#666" />
+      </Pressable>
 
-      <View style={styles.infoBar}>
-        <Ionicons name="shield-checkmark" size={14} color={Colors.light.tint} />
-        <Text style={styles.infoText}>
-          AI-powered geofence alerts will nudge you near these spots
-        </Text>
-      </View>
+      {expanded && (
+        <View style={styles.content}>
+          <View style={styles.zoneList}>
+            {dangerZones.map((zone, index) => (
+              <View key={`${zone.merchant}-${index}`} style={styles.zoneItem}>
+                <View style={styles.zoneIcon}>
+                  <MaterialIcons name="location-on" size={20} color={Colors.light.negative} />
+                </View>
+                <View style={styles.zoneInfo}>
+                  <Text style={styles.zoneName}>{zone.merchant}</Text>
+                  <Text style={styles.zoneCoords}>
+                    {zone.address || `${zone.lat.toFixed(3)}, ${zone.lng.toFixed(3)}`}
+                  </Text>
+                </View>
+                <View style={styles.regretBadge}>
+                  <Text style={styles.regretCount}>{zone.regret_count}</Text>
+                  <Text style={styles.regretLabel}>regrets</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.infoBar}>
+            <Ionicons name="shield-checkmark" size={14} color={Colors.light.tint} />
+            <Text style={styles.infoText}>
+              AI-powered geofence alerts will nudge you near these spots
+            </Text>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -77,8 +85,15 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 16,
+    justifyContent: "space-between",
+    marginBottom: 0,
+    paddingBottom: 0,
+  },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
+    flex: 1,
   },
   iconWrap: {
     width: 40,
@@ -103,44 +118,47 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   zoneList: {
-    gap: 10,
+    gap: 12,
   },
   zoneItem: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: Colors.light.surfaceElevated,
-    borderRadius: 12,
-    padding: 12,
-    gap: 10,
+    borderRadius: 16,
+    padding: 16,
+    gap: 14,
   },
   zoneIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     backgroundColor: Colors.light.negativeLight,
     alignItems: "center",
     justifyContent: "center",
   },
   zoneInfo: {
     flex: 1,
+    justifyContent: "center",
   },
   zoneName: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: "DMSans_600SemiBold",
     color: Colors.light.text,
+    marginBottom: 2,
+    lineHeight: 20,
   },
   zoneCoords: {
-    fontSize: 11,
-    fontFamily: "DMSans_400Regular",
-    color: Colors.light.textTertiary,
-    marginTop: 1,
+    fontSize: 13,
+    fontFamily: "DMSans_500Medium",
+    color: Colors.light.textSecondary,
+    lineHeight: 16,
   },
   regretBadge: {
     alignItems: "center",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     backgroundColor: Colors.light.negativeLight,
-    borderRadius: 10,
+    borderRadius: 12,
   },
   regretCount: {
     fontSize: 16,
@@ -168,6 +186,9 @@ const styles = StyleSheet.create({
     color: Colors.light.textTertiary,
     flex: 1,
   },
+  content: {
+    marginTop: 16,
+  }
 });
 
 export default DangerZoneAlert;

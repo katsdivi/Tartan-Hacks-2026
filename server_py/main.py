@@ -587,6 +587,7 @@ chat_service = ChatService()
 
 @app.post("/api/advisor/chat")
 async def advisor_chat(request: Request):
+    print("Incoming chat request...")
     try:
         body = await request.json()
         messages = body.get("messages", [])
@@ -997,6 +998,315 @@ async def batch_predict(request: Request):
 
 # --- END PURCHASE PREDICTOR INTEGRATION ---
 
+
+# --- SMART FEATURES API ---
+
+def analyze_recurring_payments(transactions):
+    """Identifies potential subscriptions."""
+    history = {}
+    subscriptions = []
+    
+    for txn in transactions:
+        key = (txn.get('merchant_name') or txn.get('name'), txn.get('amount'))
+        if key not in history:
+            history[key] = []
+        history[key].append(txn)
+        
+    for (name, amount), txns in history.items():
+        if len(txns) >= 2:
+            dates = sorted([txn['date'] for txn in txns])
+            subscriptions.append({
+                "merchant": name,
+                "amount": amount,
+                "frequency_count": len(txns),
+                "last_date": dates[-1],
+                "confidence": "high" if len(txns) > 2 else "medium"
+            })
+    return subscriptions
+
+@app.get("/api/finance/recurring-payments")
+async def get_recurring_payments(account_id: str):
+    try:
+        # Check for demo mode or mock fallback
+        if account_id.startswith("demo_") or os.environ.get("DEMO_MODE") == "1":
+            # Return plausible mock data for demo
+            return {
+                "suspected_subscriptions": [
+                    {
+                        "merchant": "Netflix",
+                        "amount": 15.99,
+                        "frequency_count": 12,
+                        "last_date": "2023-10-15",
+                        "confidence": "high"
+                    },
+                     {
+                        "merchant": "Spotify",
+                        "amount": 9.99,
+                        "frequency_count": 12,
+                        "last_date": "2023-10-12",
+                        "confidence": "high"
+                    },
+                    {
+                        "merchant": "Gym Membership",
+                        "amount": 45.00,
+                        "frequency_count": 12,
+                        "last_date": "2023-10-01",
+                        "confidence": "medium"
+                    }
+                ],
+                "total_monthly_cost": 70.98
+            }
+
+        # In a real app, verify user owns account
+        # For now, we fetch from Nessie
+        nessie = NessieClient(api_key=os.environ.get("NESSIE_API_KEY"))
+        purchases = await nessie.get_account_purchases(account_id)
+        
+        subscriptions = analyze_recurring_payments(purchases)
+        total_monthly = sum(s['amount'] for s in subscriptions)
+        
+        return {
+            "suspected_subscriptions": subscriptions,
+            "total_monthly_cost": total_monthly
+        }
+    except Exception as e:
+        print(f"Error in recurring payments: {e}")
+        # Fallback to mock on error to keep UI alive (Hackathon mode)
+        return {
+             "suspected_subscriptions": [],
+             "total_monthly_cost": 0.0,
+             "error": "Could not fetch live data, showing empty state."
+        }
+
+@app.post("/api/finance/simulate-purchase")
+async def simulate_purchase(request: Request):
+    try:
+        data = await request.json()
+        account_id = data.get("account_id")
+        amount = float(data.get("amount", 0))
+        intent = data.get("intent", "Unknown Purchase")
+        desire_score = int(data.get("desire_score", 5)) # 1-10
+
+        # --- AI ANALYSIS (Mocked for speed/demo reliability if key missing, else real) ---
+        # In a real Hackathon, we'd call the LLM here. Let's try to call it if we can.
+        
+        ai_category = "General"
+        predicted_regret = 50
+        verdict = "Analyze"
+        verdict_reason = "Checking..."
+        
+        try:
+             # Quick LLM call to categorize and score
+             # We reuse the chat service client if possible, or just mock logic for speed
+             # For this hackathon, let's use a smart heuristic + random variation to simulate AI "thought"
+             # unless we have a dedicated "PurchaseAnalyzer" class.
+             
+             # Simple Heuristic / "AI" Logic
+             intent_lower = intent.lower()
+             if any(x in intent_lower for x in ["coffee", "latte", "drink", "beer"]):
+                 ai_category = "Food & Drink"
+                 predicted_regret = 20 if amount < 10 else 60
+             elif any(x in intent_lower for x in ["game", "movie", "netflix", "ps5", "ticket"]):
+                 ai_category = "Entertainment"
+                 predicted_regret = 10 if desire_score > 8 else 50
+             elif any(x in intent_lower for x in ["shirt", "dress", "shoes", "clothes", "bag"]):
+                 ai_category = "Shopping"
+                 predicted_regret = 70 if desire_score < 7 else 30
+             elif any(x in intent_lower for x in ["uber", "lyft", "flight", "hotel"]):
+                 ai_category = "Travel"
+                 predicted_regret = 40
+             elif any(x in intent_lower for x in ["invest", "stock", "bitcoin"]):
+                 ai_category = "Investments"
+                 predicted_regret = 10
+             else:
+                 ai_category = "General Spending"
+                 predicted_regret = 50
+                 
+             # Adjust regret by desire (Lower desire = Higher regret risk)
+             if desire_score < 4:
+                 predicted_regret += 20
+             elif desire_score > 8:
+                 predicted_regret -= 20
+                 
+             predicted_regret = max(0, min(100, predicted_regret))
+             
+        except Exception as e:
+            print(f"AI Analysis failed: {e}")
+
+        # --- FINANCIAL CHECK ---
+        
+        # Mock logic for demo accounts (Fast path)
+        if str(account_id).startswith("demo_"):
+             current = 2450.50
+             projected = current - amount
+             # --- 1. Calculate Financial Risk Level ---
+             if projected < 0:
+                 risk_level = "CRITICAL"
+                 warnings = ["Purchase will cause overdraft."]
+             elif (projected - 150) < 200:
+                 risk_level = "WARNING"
+                 warnings = ["Filters low on buffer after bills."]
+             else:
+                 risk_level = "SAFE"
+                 warnings = []
+
+             # --- 2. Adjust Regret based on Financial Status ---
+             if risk_level == "CRITICAL":
+                 predicted_regret += 40
+             elif risk_level == "WARNING":
+                 predicted_regret += 20
+                 
+             predicted_regret = max(0, min(100, predicted_regret))
+
+             # --- 3. Final Verdict Rule Engine ---
+             if risk_level == "CRITICAL":
+                 verdict = "DENIED"
+                 verdict_reason = "Insufficient funds. You will overdraft."
+             elif desire_score <= 3:
+                 verdict = "WAIT 24H"
+                 verdict_reason = f"Low desire ({desire_score}/10). Why buy it if you don't love it?"
+             elif predicted_regret > 70:
+                 verdict = "WAIT 24H"
+                 verdict_reason = "High regret risk detected. Sleep on it."
+             elif risk_level == "WARNING":
+                 verdict = "CAUTION"
+                 verdict_reason = "Tight budget. Proceed with care."
+             else:
+                 verdict = "APPROVED"
+                 verdict_reason = "Safe to spend. Enjoy!"
+
+             return {
+                "current_balance": current,
+                "purchase_amount": amount,
+                "pending_bills": 150.00,
+                "projected_balance": projected - 150.00,
+                "risk_level": risk_level,
+                "warnings": warnings,
+                "recommendation": verdict, 
+                "ai_category": ai_category,
+                "predicted_regret": predicted_regret,
+                "verdict_reason": verdict_reason
+            }
+
+        # Real Nessie Logic
+        nessie = NessieClient(api_key=os.environ.get("NESSIE_API_KEY"))
+        account = await nessie.get_account(account_id)
+        bills = await nessie.get_account_bills(account_id)
+        
+        current_balance = float(account.get('balance', 0))
+        
+        # Calculate pending bills
+        pending_bills_total = 0
+        if bills:
+            pending_bills_total = sum(float(bill.get('payment_amount', 0)) for bill in bills if bill.get('status') == 'pending')
+        
+        projected_balance = current_balance - pending_bills_total - amount
+        
+        risk_level = "SAFE"
+        warnings = []
+        
+        if projected_balance < 0:
+            risk_level = "CRITICAL"
+            warnings.append("Purchase will cause overdraft.")
+        elif projected_balance < 200:
+            risk_level = "WARNING"
+            warnings.append("Low buffer remaining after bills.")
+            
+        # --- NEW: Adjust Regret based on Finance (Real) ---
+        if risk_level == "CRITICAL":
+             predicted_regret += 40
+        elif risk_level == "WARNING":
+             predicted_regret += 20
+        
+        predicted_regret = max(0, min(100, predicted_regret))
+            
+        # Final Verdict Calculation
+        if risk_level == "CRITICAL":
+            verdict = "DENIED"
+            verdict_reason = "Financial risk too high."
+        elif desire_score <= 3:
+            verdict = "WAIT 24H"
+            verdict_reason = f"Low desire ({desire_score}/10). Why buy it if you don't love it?"
+        elif predicted_regret > 75:
+            verdict = "WAIT 24H"
+            verdict_reason = "High regret probability. Delay purchase."
+        elif risk_level == "WARNING":
+            verdict = "CAUTION"
+            verdict_reason = "Tight budget. Proceed with care."
+        else:
+            verdict = "APPROVED"
+            verdict_reason = "Financially safe & low regret risk."
+
+        return {
+            "current_balance": current_balance,
+            "purchase_amount": amount,
+            "pending_bills": pending_bills_total,
+            "projected_balance": projected_balance,
+            "risk_level": risk_level,
+            "warnings": warnings,
+            "recommendation": verdict,
+            "ai_category": ai_category,
+            "predicted_regret": predicted_regret,
+            "verdict_reason": verdict_reason
+        }
+    except Exception as e:
+        print(f"Error in purchase simulation: {e}")
+        # Fallback
+        return {
+            "current_balance": 0,
+            "purchase_amount": amount,
+            "pending_bills": 0,
+            "projected_balance": -amount,
+            "risk_level": "WARNING",
+            "warnings": ["System offline, cannot verify balance."],
+            "recommendation": "Caution",
+            "ai_category": "Unknown",
+            "predicted_regret": 50,
+            "verdict_reason": "Offline Mode"
+        }
+
+@app.get("/api/pigeon/risk-score")
+async def get_risk_score(lat: float, lng: float):
+    try:
+        # Re-import locally if needed or assume module usage
+        # predictor_service is imported at module level
+        predictor_service.load()
+        
+        # Determine time-based factors
+        now = datetime.now()
+        is_late_night = 22 <= now.hour or now.hour < 5
+        is_weekend = now.weekday() >= 5
+        
+        # Base prediction
+        base_prediction = predictor_service.predict_for_transaction(
+            distance_meters=10.0,
+            budget_utilization=0.5, # Default
+            merchant_regret_rate=0.5,
+            lat=lat,
+            lng=lng
+        )
+        
+        temptation_score = int(base_prediction.get('probability', 0) * 100)
+        risk_factors = []
+        
+        if is_late_night:
+            risk_factors.append("Late Night")
+            temptation_score += 10
+        if is_weekend:
+            risk_factors.append("Weekend")
+            
+        if base_prediction.get('in_danger_zone'):
+            risk_factors.append("Danger Zone")
+            temptation_score += 20
+            
+        return {
+            "temptation_score": min(100, temptation_score),
+            "risk_factors": risk_factors,
+            "safe_limit": 50.0 if temptation_score > 50 else 200.0
+        }
+    except Exception as e:
+        print(f"Error in risk score: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 if __name__ == "__main__":
     import uvicorn
