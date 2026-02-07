@@ -191,6 +191,17 @@ class PurchasePredictorService:
                 "avg_regret_score": zone.get("regret_count", 0) / 100.0  # Normalize to 0-1
             })
         
+        # Add requested global danger zone
+        transformed_zones.append({
+            "id": "Global Danger Zone",
+            "merchant_name": "Area 69",
+            "lat": 69.69,
+            "lng": 42.00,
+            "radius": 500.0,  # Larger radius to make it easier to hit
+            "merchant_category": "Restricted Area",
+            "avg_regret_score": 1.0  # Max regret
+        })
+        
         return transformed_zones
 
     def check_danger_zone(self, lat: float, lng: float, radius_km: float = 0.5) -> Optional[Dict]:
