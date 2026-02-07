@@ -49,8 +49,8 @@ function MiniChart({ data, prediction }: { data: number[]; prediction: number[] 
 
   const predPath = prediction.length > 0
     ? [toPoint(data[data.length - 1], data.length - 1), ...prediction.map((v, i) => toPoint(v, data.length + i))]
-        .map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`)
-        .join(" ")
+      .map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`)
+      .join(" ")
     : "";
 
   const Svg = require("react-native-svg");
@@ -130,11 +130,125 @@ function ErrorPopup({ message, onDismiss, onDemo }: { message: string; onDismiss
   );
 }
 
+function SpendingOverview({ transactions }: { transactions: any[] }) {
+  // 1. Get last 7 days
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (6 - i));
+    return d.toISOString().split("T")[0];
+  });
+
+  // 2. Aggregate spending per day
+  const spendingByDay = days.reduce((acc, day) => {
+    acc[day] = 0;
+    return acc;
+  }, {} as Record<string, number>);
+
+  transactions.forEach((t) => {
+    if (t.amount > 0 && t.date) {
+      const day = t.date.split("T")[0];
+      if (spendingByDay[day] !== undefined) {
+        spendingByDay[day] += t.amount;
+      }
+    }
+  });
+
+  // 3. Last 5 transactions
+  const last5 = [...transactions]
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, 5);
+
+  const maxSpend = Math.max(...Object.values(spendingByDay), 1);
+
+  return (
+    <View style={styles.sectionBlock}>
+      <Text style={styles.sectionTitle}>Spending Activity</Text>
+
+      {/* 7-Day Strip */}
+      <View style={styles.calendarStrip}>
+        {days.map((day, index) => {
+          const dateObj = new Date(day);
+          const dayName = dateObj.toLocaleDateString("en-US", { weekday: "narrow" }); // M, T, W...
+          const dayNum = dateObj.getDate();
+          const amount = spendingByDay[day];
+          const isToday = index === 6;
+
+          return (
+            <View key={day} style={[styles.calendarDay, isToday && styles.calendarDayToday]}>
+              <Text style={[styles.calendarDayName, isToday && styles.calendarTextToday]}>{dayName}</Text>
+              <Text style={[styles.calendarDayNum, isToday && styles.calendarTextToday]}>{dayNum}</Text>
+              <View style={styles.calendarBarWrap}>
+                <View style={[styles.calendarBar, { height: `${Math.min((amount / maxSpend) * 100, 100)}%` }, isToday && { backgroundColor: Colors.light.background }]} />
+              </View>
+              <Text style={[styles.calendarAmount, isToday && styles.calendarTextToday]}>
+                {amount > 0 ? `$${Math.round(amount)}` : "-"}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+
+      {/* Divider */}
+      <View style={styles.divider} />
+
+      {/* Last 5 Transactions */}
+      <Text style={styles.subTitle}>Recent Transactions</Text>
+      <View style={styles.recentList}>
+        {last5.map((t) => (
+          <View key={t.transaction_id} style={styles.recentItem}>
+            <View style={styles.recentIcon}>
+              <Ionicons name="receipt-outline" size={16} color={Colors.light.tint} />
+            </View>
+            <View style={styles.recentInfo}>
+              <Text style={styles.recentName} numberOfLines={1}>{t.name || t.merchant_name || "Transaction"}</Text>
+              <Text style={styles.recentDate}>{new Date(t.date).toLocaleDateString()}</Text>
+            </View>
+            <Text style={styles.recentAmount}>
+              {t.amount < 0 ? "+" : ""}${Math.abs(t.amount).toFixed(2)}
+            </Text>
+          </View>
+        ))}
+        {last5.length === 0 && (
+          <Text style={styles.emptyText}>No recent transactions</Text>
+        )}
+      </View>
+    </View>
+  );
+}
+
+function BudgetProgress({ budgets }: { budgets: any[] }) {
+  const totalLimit = budgets.reduce((sum, b) => sum + b.limit, 0);
+  const totalSpent = budgets.reduce((sum, b) => sum + b.spent, 0);
+  const percent = totalLimit > 0 ? Math.min((totalSpent / totalLimit) * 100, 100) : 0;
+
+  return (
+    <View style={styles.sectionBlock}>
+      <View style={styles.budgetHeader}>
+        <Text style={styles.sectionTitle}>Monthly Budget</Text>
+        <Text style={styles.budgetPercent}>{percent.toFixed(0)}%</Text>
+      </View>
+
+      <View style={styles.budgetBarBg}>
+        <LinearGradient
+          colors={[Colors.light.tint, Colors.light.gradient2]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={[styles.budgetBarFill, { width: `${percent}%` }]}
+        />
+      </View>
+
+      <Text style={styles.budgetSummary}>
+        <Text style={{ fontFamily: 'DMSans_700Bold', color: Colors.light.text }}>${Math.round(totalSpent).toLocaleString()}</Text> spent out of <Text style={{ fontFamily: 'DMSans_700Bold', color: Colors.light.textTertiary }}>${Math.round(totalLimit).toLocaleString()}</Text>
+      </Text>
+    </View>
+  );
+}
+
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const {
     isConnected, isDemoMode, isLoading, accounts, totalNetWorth, netWorthHistory,
-    transactions, refreshData, connectionError, dismissError, loadDemoData,
+    transactions, budgets, refreshData, connectionError, dismissError, loadDemoData,
   } = useFinance();
 
   const checkHealth = () => {
@@ -152,10 +266,10 @@ export default function DashboardScreen() {
 
   const predictionData = netWorthHistory.length > 0
     ? Array.from({ length: 3 }, (_, i) => {
-        const last = netWorthHistory[netWorthHistory.length - 1].value;
-        const growthRate = 0.015;
-        return Math.round(last * (1 + growthRate * (i + 1)));
-      })
+      const last = netWorthHistory[netWorthHistory.length - 1].value;
+      const growthRate = 0.015;
+      return Math.round(last * (1 + growthRate * (i + 1)));
+    })
     : [];
 
   const monthlyChange = netWorthHistory.length >= 2
@@ -288,6 +402,9 @@ export default function DashboardScreen() {
               <Text style={styles.statLabel}>Growth</Text>
             </View>
           </View>
+
+          <SpendingOverview transactions={transactions} />
+          <BudgetProgress budgets={budgets} />
 
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Accounts</Text>
@@ -618,5 +735,143 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "DMSans_500Medium",
     color: Colors.light.textSecondary,
+  },
+  sectionBlock: {
+    backgroundColor: Colors.light.surface,
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+  },
+  calendarStrip: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+    marginTop: 10,
+  },
+  calendarDay: {
+    alignItems: 'center',
+    gap: 4,
+    width: 38,
+  },
+  calendarDayToday: {
+    backgroundColor: Colors.light.tint,
+    borderRadius: 12,
+    paddingVertical: 8,
+    marginTop: -8,
+    marginBottom: -8,
+  },
+  calendarTextToday: {
+    color: Colors.light.background,
+  },
+  calendarDayName: {
+    fontSize: 11,
+    fontFamily: 'DMSans_500Medium',
+    color: Colors.light.textTertiary,
+  },
+  calendarDayNum: {
+    fontSize: 13,
+    fontFamily: 'DMSans_700Bold',
+    color: Colors.light.text,
+  },
+  calendarBarWrap: {
+    height: 40,
+    width: 6,
+    backgroundColor: Colors.light.surfaceElevated,
+    borderRadius: 3,
+    justifyContent: 'flex-end',
+    marginVertical: 4,
+    overflow: 'hidden',
+  },
+  calendarBar: {
+    width: '100%',
+    backgroundColor: Colors.light.tintLight,
+    borderRadius: 3,
+  },
+  calendarAmount: {
+    fontSize: 10,
+    fontFamily: 'DMSans_500Medium',
+    color: Colors.light.textSecondary,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: Colors.light.border,
+    marginBottom: 16,
+  },
+  subTitle: {
+    fontSize: 15,
+    fontFamily: 'DMSans_600SemiBold',
+    color: Colors.light.text,
+    marginBottom: 12,
+  },
+  recentList: {
+    gap: 12,
+  },
+  recentItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  recentIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: Colors.light.surfaceElevated,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recentInfo: {
+    flex: 1,
+  },
+  recentName: {
+    fontSize: 14,
+    fontFamily: 'DMSans_500Medium',
+    color: Colors.light.text,
+  },
+  recentDate: {
+    fontSize: 12,
+    fontFamily: 'DMSans_400Regular',
+    color: Colors.light.textTertiary,
+  },
+  recentAmount: {
+    fontSize: 14,
+    fontFamily: 'DMSans_600SemiBold',
+    color: Colors.light.text,
+  },
+  emptyText: {
+    fontSize: 13,
+    color: Colors.light.textTertiary,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: 10,
+  },
+  budgetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  budgetPercent: {
+    fontSize: 14,
+    fontFamily: 'DMSans_700Bold',
+    color: Colors.light.tint,
+  },
+  budgetBarBg: {
+    height: 12,
+    backgroundColor: Colors.light.surfaceElevated,
+    borderRadius: 6,
+    overflow: 'hidden',
+    marginBottom: 10,
+  },
+  budgetBarFill: {
+    height: '100%',
+    borderRadius: 6,
+  },
+  budgetSummary: {
+    fontSize: 13,
+    fontFamily: 'DMSans_400Regular',
+    color: Colors.light.textSecondary,
+    textAlign: 'right',
   },
 });
