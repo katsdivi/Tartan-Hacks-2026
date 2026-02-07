@@ -624,6 +624,8 @@ async def advisor_chat(request: Request):
 # --- END CHAT INTEGRATION ---
 
 import database # Import local database module
+from predictor_service import predictor_service
+from datetime import datetime # Added for Pigeon quiet hours
 
 @app.post("/api/advisor/survey-analysis")
 async def survey_analysis(request: Request):
@@ -664,8 +666,238 @@ async def advisor_insights(request: Request):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+# --- PIGEON GEO-BEHAVIORAL RISK DETECTION ---
+
+@app.get("/api/pigeon/danger-zones")
+async def get_danger_zones():
+    """Get all danger zones with regret data from ML pipeline"""
+    try:
+        predictor_service.load()
+        zones = predictor_service.get_danger_zones()
+        return {"danger_zones": zones, "count": len(zones)}
+    except Exception as e:
+        print(f"Danger zones error: {e}")
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.post("/api/pigeon/check-location")
+async def check_location(request: Request):
+    """
+    Check if user's location is in a danger zone and predict regret risk.
+    
+    Body: {
+        "lat": float,
+        "lng": float,
+        "budgetUtilization": float (0.0-1.0),
+        "merchantCategory": str (optional)
+    }
+    """
+    try:
+        body = await request.json()
+        lat = body.get("lat")
+        lng = body.get("lng")
+        budget_util = body.get("budgetUtilization", 0.5)
+        merchant_category = body.get("merchantCategory", "Unknown")
+        
+        if lat is None or lng is None:
+            return JSONResponse({"error": "lat and lng required"}, status_code=400)
+        
+        # Get user settings
+        settings = database.get_pigeon_user_settings()
+        
+        # Check if monitoring is enabled
+        if not settings["monitoring_enabled"]:
+            return {"monitoring_enabled": False, "should_notify": False}
+        
+        # Check quiet hours
+        now = datetime.now()
+        current_hour = now.hour
+        quiet_start = settings["quiet_hours_start"]
+        quiet_end = settings["quiet_hours_end"]
+        
+        in_quiet_hours = False
+        if quiet_start > quiet_end:  # Wraps midnight
+            in_quiet_hours = current_hour >= quiet_start or current_hour < quiet_end
+        else:
+            in_quiet_hours = quiet_start <= current_hour < quiet_end
+        
+        # Get merchant regret rate from DB (based on category)
+        user_profile = database.get_user_profile()
+        merchant_regret_rate = 0.5  # Default
+        
+        if user_profile and merchant_category:
+            # Check if this category is in user's high-regret categories
+            top_categories = user_profile.get("top_categories", [])
+            if merchant_category in top_categories:
+                merchant_regret_rate = 0.75  # Higher regret for known problem categories
+        
+        # Run prediction
+        prediction = predictor_service.predict_for_transaction(
+            distance_meters=10.0,  # Assume user is at the location
+            budget_utilization=budget_util,
+            merchant_regret_rate=merchant_regret_rate,
+            dwell_time_seconds=0,
+            lat=lat,
+            lng=lng
+        )
+        
+        # Determine if we should notify
+        should_notify = (
+            prediction["should_nudge"]
+            and prediction["in_danger_zone"]
+            and not in_quiet_hours
+            and budget_util >= 0.6  # Only notify if budget is somewhat depleted
+        )
+        
+        # Calculate regret score (1-100)
+        regret_score = int(prediction["probability"] * 100)
+        
+        result = {
+            "monitoring_enabled": True,
+            "in_danger_zone": prediction["in_danger_zone"],
+            "danger_zone": prediction.get("danger_zone"),
+            "predicted_probability": prediction["probability"],
+            "regret_score": regret_score,
+            "risk_level": prediction["risk_level"],
+            "should_notify": should_notify,
+            "in_quiet_hours": in_quiet_hours,
+            "model_type": prediction["model_type"]
+        }
+        
+        # If should notify, generate notification message
+        if should_notify:
+            zone_name = prediction.get("danger_zone", {}).get("merchant_name", "this location")
+            notification_message = await generate_notification_message(
+                zone_name, merchant_category, regret_score, budget_util, current_hour
+            )
+            result["notification_message"] = notification_message
+            
+            # Log intervention
+            intervention_id = database.save_pigeon_intervention(
+                danger_zone_id=prediction.get("danger_zone", {}).get("merchant_name", "unknown"),
+                latitude=lat,
+                longitude=lng,
+                predicted_probability=prediction["probability"],
+                predicted_score=regret_score,
+                risk_level=prediction["risk_level"],
+                merchant_category=merchant_category,
+                budget_utilization=budget_util,
+                hour_of_day=current_hour,
+                notification_sent=True,
+                notification_message=notification_message
+            )
+            result["intervention_id"] = intervention_id
+        
+        return result
+        
+    except Exception as e:
+        print(f"Check location error: {e}")
+        import traceback
+        traceback.print_exc()
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+async def generate_notification_message(
+    zone_name: str,
+    category: str,
+    regret_score: int,
+    budget_util: float,
+    hour: int
+) -> str:
+    """Generate contextual notification message using AI"""
+    try:
+        # Build context for AI
+        user_profile = database.get_user_profile()
+        goals = user_profile.get("user_goals", "") if user_profile else ""
+        
+        prompt = f"""Generate a brief, actionable notification message (max 2 sentences) for a spending intervention alert.
+
+Context:
+- Location: {zone_name}
+- Category: {category}
+- Predicted regret score: {regret_score}/100
+- Budget utilization: {int(budget_util * 100)}%
+- Time: {hour}:00 (24-hour)
+- User goals: {goals}
+
+The message should:
+1. State the behavioral signal detected
+2. Relate to their budget or goals
+3. Be encouraging, not judgmental
+
+Example: "You're near {zone_name} at {hour}:00. Late-night {category} purchases typically have a {regret_score}% regret rate, and you've used {int(budget_util * 100)}% of your budget."
+
+Generate only the notification message, nothing else."""
+
+        messages = [{"role": "user", "content": prompt}]
+        response = await chat_service.dedalus_client.chat_completion(
+            "openai/gpt-4o-mini", messages, stream=False
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        print(f"Notification generation error: {e}")
+        # Fallback message
+        return f"⚠️ High regret risk near {zone_name}. Predicted regret: {regret_score}/100. You've used {int(budget_util * 100)}% of your budget."
+
+
+@app.post("/api/pigeon/log-intervention")
+async def log_intervention(request: Request):
+    """Log a Pigeon intervention (for manual logging from frontend)"""
+    try:
+        body = await request.json()
+        intervention_id = database.save_pigeon_intervention(**body)
+        return {"intervention_id": intervention_id, "success": True}
+    except Exception as e:
+        print(f"Log intervention error: {e}")
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.post("/api/pigeon/intervention-feedback")
+async def intervention_feedback(request: Request):
+    """Update intervention with user feedback"""
+    try:
+        body = await request.json()
+        intervention_id = body.get("intervention_id")
+        user_response = body.get("user_response")  # helpful/not_helpful/ignored
+        
+        if not intervention_id or not user_response:
+            return JSONResponse({"error": "intervention_id and user_response required"}, status_code=400)
+        
+        database.update_pigeon_intervention_response(intervention_id, user_response)
+        return {"success": True}
+    except Exception as e:
+        print(f"Intervention feedback error: {e}")
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.get("/api/pigeon/settings")
+async def get_pigeon_settings():
+    """Get user's Pigeon settings"""
+    try:
+        settings = database.get_pigeon_user_settings()
+        return settings
+    except Exception as e:
+        print(f"Get settings error: {e}")
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.post("/api/pigeon/settings")
+async def update_pigeon_settings(request: Request):
+    """Update user's Pigeon settings"""
+    try:
+        body = await request.json()
+        database.update_pigeon_user_settings(**body)
+        return {"success": True, "settings": database.get_pigeon_user_settings()}
+    except Exception as e:
+        print(f"Update settings error: {e}")
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+# --- END PIGEON INTEGRATION ---
+
+
 # --- PURCHASE PREDICTOR INTEGRATION ---
-from predictor_service import predictor_service
+# The predictor_service import was moved up to be with other imports
+# from predictor_service import predictor_service # This line is now redundant here
 
 @app.on_event("startup")
 async def load_predictor():

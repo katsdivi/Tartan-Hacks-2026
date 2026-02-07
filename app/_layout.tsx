@@ -8,6 +8,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { queryClient } from "@/lib/query-client";
 import { FinanceProvider } from "@/lib/finance-context";
+import { PigeonProvider } from "@/lib/pigeon-context";
 import { useFonts, DMSans_400Regular, DMSans_500Medium, DMSans_600SemiBold, DMSans_700Bold } from "@expo-google-fonts/dm-sans";
 
 function RootLayoutNav() {
@@ -48,8 +49,10 @@ export default function RootLayout() {
         <GestureHandlerRootView>
           <KeyboardProvider>
             <FinanceProvider>
-              <StatusBar style="light" />
-              <RootLayoutNav />
+              <PigeonProvider>
+                <StatusBar style="light" />
+                <RootLayoutNav />
+              </PigeonProvider>
             </FinanceProvider>
           </KeyboardProvider>
         </GestureHandlerRootView>

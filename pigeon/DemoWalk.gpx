@@ -1,0 +1,11 @@
+<gpx version="1.1" creator="Xcode">
+    <wpt lat="50.442" lon="-79.943">
+        <name>Start</name>
+        <time>2026-02-06T10:00:00Z</time>
+    </wpt>
+    
+    <wpt lat="40.444" lon="-79.943">
+        <name>The Trap</name>
+        <time>2026-02-06T10:00:10Z</time>
+    </wpt>
+</gpx>
