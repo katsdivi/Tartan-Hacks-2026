@@ -15,6 +15,7 @@ import { router } from "expo-router";
 import { useFinance } from "@/lib/finance-context";
 import { createLinkToken } from "@/lib/plaid-service";
 import Colors from "@/constants/colors";
+import FinanceTip from "@/components/FinanceTip";
 
 const DEMO_MODE_ENV = process.env.EXPO_PUBLIC_DEMO_MODE === "1";
 
@@ -141,6 +142,9 @@ export default function PlaidLinkScreen() {
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color={Colors.light.tint} />
           <Text style={styles.loadingText}>Preparing secure connection...</Text>
+          <View style={styles.tipWrap}>
+            <FinanceTip />
+          </View>
         </View>
       ) : error ? (
         <View style={styles.centerContent}>
@@ -267,6 +271,11 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: "DMSans_400Regular",
     color: Colors.light.textSecondary,
+  },
+  tipWrap: {
+    width: "100%",
+    marginTop: 24,
+    paddingHorizontal: 0,
   },
   errorIconWrap: {
     width: 64,

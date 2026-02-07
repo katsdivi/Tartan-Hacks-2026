@@ -16,6 +16,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useFinance } from "@/lib/finance-context";
 import Colors from "@/constants/colors";
+import FinanceTip from "@/components/FinanceTip";
 
 const DEMO_MODE_ENV = process.env.EXPO_PUBLIC_DEMO_MODE === "1";
 
@@ -196,41 +197,48 @@ export default function DashboardScreen() {
       </View>
 
       {!isConnected ? (
-        <View style={styles.connectCard}>
-          <LinearGradient
-            colors={[Colors.light.gradient1, Colors.light.gradient2]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.connectGradient}
-          >
-            <Ionicons name="shield-checkmark" size={40} color={Colors.light.background} />
-            <Text style={styles.connectTitle}>Connect Your Bank</Text>
-            <Text style={styles.connectSubtitle}>
-              Link your accounts to track spending, net worth, and get personalized advice.
-            </Text>
-            <View style={styles.connectActions}>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.connectButton,
-                  pressed && { opacity: 0.9 },
-                  DEMO_MODE_ENV && { backgroundColor: Colors.light.surfaceElevated } // Visually disable
-                ]}
-                onPress={DEMO_MODE_ENV ? loadDemoData : () => router.push("/plaid-link")} // Load demo data if DEMO_MODE, else go to Plaid
-              >
-                <Text style={[styles.connectButtonText, DEMO_MODE_ENV && { color: Colors.light.textSecondary }]}>
-                  {DEMO_MODE_ENV ? "Connect Bank (Dev Build)" : "Connect Account"}
-                </Text>
-                {!DEMO_MODE_ENV && <Ionicons name="arrow-forward" size={18} color={Colors.light.gradient1} />}
-              </Pressable>
-              <Pressable
-                style={({ pressed }) => [styles.demoButton, pressed && { opacity: 0.7 }]}
-                onPress={loadDemoData}
-              >
-                <Text style={styles.demoButtonText}>Try Demo Data</Text>
-              </Pressable>
-            </View>
-          </LinearGradient>
-        </View>
+        <>
+          <View style={styles.connectCard}>
+            <LinearGradient
+              colors={[Colors.light.gradient1, Colors.light.gradient2]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.connectGradient}
+            >
+              <Ionicons name="shield-checkmark" size={40} color={Colors.light.background} />
+              <Text style={styles.connectTitle}>Connect Your Bank</Text>
+              <Text style={styles.connectSubtitle}>
+                Link your accounts to track spending, net worth, and get personalized advice.
+              </Text>
+              <View style={styles.connectActions}>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.connectButton,
+                    pressed && { opacity: 0.9 },
+                    DEMO_MODE_ENV && { backgroundColor: Colors.light.surfaceElevated }
+                  ]}
+                  onPress={DEMO_MODE_ENV ? loadDemoData : () => router.push("/plaid-link")}
+                >
+                  <Text style={[styles.connectButtonText, DEMO_MODE_ENV && { color: Colors.light.textSecondary }]}>
+                    {DEMO_MODE_ENV ? "Connect Bank (Dev Build)" : "Connect Account"}
+                  </Text>
+                  {!DEMO_MODE_ENV && <Ionicons name="arrow-forward" size={18} color={Colors.light.gradient1} />}
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [styles.demoButton, pressed && { opacity: 0.7 }]}
+                  onPress={loadDemoData}
+                >
+                  <Text style={styles.demoButtonText}>Try Demo Data</Text>
+                </Pressable>
+              </View>
+            </LinearGradient>
+          </View>
+
+          <View style={{ marginBottom: 24 }}>
+            <Text style={styles.tipLabel}>Did you know?</Text>
+            <FinanceTip />
+          </View>
+        </>
       ) : (
         <>
           <View style={styles.netWorthCard}>
@@ -295,6 +303,12 @@ export default function DashboardScreen() {
           {accounts.map((account) => (
             <AccountCard key={account.account_id} account={account} />
           ))}
+
+          {isLoading && (
+            <View style={{ marginTop: 16 }}>
+              <FinanceTip />
+            </View>
+          )}
         </>
       )}
 
@@ -618,5 +632,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "DMSans_500Medium",
     color: Colors.light.textSecondary,
+  },
+  tipLabel: {
+    fontSize: 13,
+    fontFamily: "DMSans_600SemiBold",
+    color: Colors.light.textSecondary,
+    marginBottom: 8,
   },
 });

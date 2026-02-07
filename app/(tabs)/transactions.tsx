@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useFinance } from "@/lib/finance-context";
 import Colors from "@/constants/colors";
+import FinanceTip from "@/components/FinanceTip";
 
 function getCategoryIcon(categories: string[] | null, name: string): { icon: string; color: string } {
   const cat = (categories?.[0] || "").toLowerCase();
@@ -146,6 +147,9 @@ export default function TransactionsScreen() {
           <Text style={styles.emptySubtitle}>
             Connect your bank account to see your recent transactions here.
           </Text>
+          <View style={styles.tipWrap}>
+            <FinanceTip />
+          </View>
         </View>
       ) : (
         <FlatList
@@ -166,6 +170,13 @@ export default function TransactionsScreen() {
           }
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.listContent}
+          ListHeaderComponent={
+            isLoading ? (
+              <View style={{ marginBottom: 12 }}>
+                <FinanceTip />
+              </View>
+            ) : null
+          }
           ListEmptyComponent={
             !isLoading ? (
               <View style={styles.emptyState}>
@@ -321,5 +332,9 @@ const styles = StyleSheet.create({
     color: Colors.light.textSecondary,
     textAlign: "center",
     lineHeight: 20,
+  },
+  tipWrap: {
+    width: "100%",
+    marginTop: 20,
   },
 });

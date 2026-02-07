@@ -17,6 +17,7 @@ import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useFinance } from "@/lib/finance-context";
 import Colors from "@/constants/colors";
+import FinanceTip from "@/components/FinanceTip";
 
 function BudgetBar({ category }: { category: any }) {
   const progress = category.limit > 0 ? Math.min(category.spent / category.limit, 1) : 0;
@@ -81,7 +82,6 @@ const COLOR_OPTIONS = [
   Colors.light.neonPink,
   Colors.light.neonPurple,
   Colors.light.neonGreen,
-  Colors.light.negative,
   Colors.light.neonYellow,
   "#FF8C00",
 ];
@@ -216,6 +216,12 @@ export default function BudgetScreen() {
           </Pressable>
         ))}
 
+        {isLoading && budgets.length > 0 && (
+          <View style={{ marginBottom: 12 }}>
+            <FinanceTip />
+          </View>
+        )}
+
         {budgets.length === 0 && (
           <View style={styles.emptyState}>
             <Ionicons name="pie-chart-outline" size={32} color={Colors.light.textTertiary} />
@@ -223,6 +229,9 @@ export default function BudgetScreen() {
             <Text style={styles.emptySubtitle}>
               Tap the + button to create your first budget category.
             </Text>
+            <View style={styles.tipWrap}>
+              <FinanceTip />
+            </View>
           </View>
         )}
 
@@ -496,6 +505,10 @@ const styles = StyleSheet.create({
     color: Colors.light.textSecondary,
     textAlign: "center",
     lineHeight: 20,
+  },
+  tipWrap: {
+    width: "100%",
+    marginTop: 20,
   },
   modalOverlay: {
     flex: 1,

@@ -2,7 +2,7 @@ import 'dotenv/config'
 import { spawn } from "child_process";
 import * as path from "path";
 
-const pythonServer = spawn("/opt/anaconda3/bin/python", [path.resolve(process.cwd(), "server_py", "main.py")], {
+const pythonServer = spawn("/Library/Frameworks/Python.framework/Versions/3.12/bin/python3", [path.resolve(process.cwd(), "server_py", "main.py")], {
   stdio: "inherit",
   env: process.env,
 });

@@ -19,6 +19,7 @@ import { getApiUrl } from "@/lib/query-client";
 import { useFinance } from "@/lib/finance-context";
 import Colors from "@/constants/colors";
 import Markdown from "react-native-markdown-display";
+import FinanceTip from "@/components/FinanceTip";
 
 interface Message {
   id: string;
@@ -98,13 +99,18 @@ function MessageBubble({ message }: { message: Message }) {
 
 function TypingIndicator() {
   return (
-    <View style={[styles.bubbleContainer, styles.assistantBubbleContainer]}>
-      <View style={styles.avatarWrap}>
-        <Ionicons name="sparkles" size={16} color={Colors.light.tint} />
+    <View>
+      <View style={[styles.bubbleContainer, styles.assistantBubbleContainer]}>
+        <View style={styles.avatarWrap}>
+          <Ionicons name="sparkles" size={16} color={Colors.light.tint} />
+        </View>
+        <View style={[styles.bubble, styles.assistantBubble, styles.typingBubble]}>
+          <ActivityIndicator size="small" color={Colors.light.tint} />
+          <Text style={styles.typingText}>Analyzing...</Text>
+        </View>
       </View>
-      <View style={[styles.bubble, styles.assistantBubble, styles.typingBubble]}>
-        <ActivityIndicator size="small" color={Colors.light.tint} />
-        <Text style={styles.typingText}>Analyzing...</Text>
+      <View style={styles.tipWrap}>
+        <FinanceTip />
       </View>
     </View>
   );
@@ -321,10 +327,10 @@ Guidelines:
         </View>
       ) : (
         <FlatList
-          data={reversedMessages}
+          data={[...messages].reverse()}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => <MessageBubble message={item} />}
-          inverted={messages.length > 0}
+          inverted
           ListHeaderComponent={showTyping ? <TypingIndicator /> : null}
           keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
@@ -569,5 +575,9 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     backgroundColor: Colors.light.borderLight,
+  },
+  tipWrap: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
   },
 });

@@ -1,5 +1,6 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -46,6 +47,7 @@ export default function RootLayout() {
         <GestureHandlerRootView>
           <KeyboardProvider>
             <FinanceProvider>
+              <StatusBar style="light" />
               <RootLayoutNav />
             </FinanceProvider>
           </KeyboardProvider>
