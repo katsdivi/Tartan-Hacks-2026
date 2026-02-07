@@ -173,10 +173,25 @@ class PurchasePredictorService:
 
         return min(1.0, max(0.0, score))
 
-    def get_danger_zones(self) -> List[Dict]:
-        """Return list of danger zone locations with regret data."""
-        self.load()
-        return self.danger_zones
+    def get_danger_zones(self) -> List[Dict[str, Any]]:
+        """Return all danger zones with merchant data."""
+        if not self._loaded:
+            self.load()
+        
+        # Transform danger zones to match frontend expectations
+        transformed_zones = []
+        for zone in self.danger_zones:
+            transformed_zones.append({
+                "id": zone.get("merchant", "unknown"),
+                "merchant_name": zone.get("merchant", "Unknown"),
+                "lat": zone.get("lat", 0.0),
+                "lng": zone.get("lng", 0.0),
+                "radius": 50.0,  # Default 50m radius
+                "merchant_category": zone.get("category", "Food and Drink"),
+                "avg_regret_score": zone.get("regret_count", 0) / 100.0  # Normalize to 0-1
+            })
+        
+        return transformed_zones
 
     def check_danger_zone(self, lat: float, lng: float, radius_km: float = 0.5) -> Optional[Dict]:
         """

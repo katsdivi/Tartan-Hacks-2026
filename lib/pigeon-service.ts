@@ -1,16 +1,16 @@
 /**
- * Pigeon Geofencing Service
+ * Pigeon Geofencing Service - EXPO GO COMPATIBLE VERSION
  * 
- * Cross-platform geolocation monitoring for behavioral risk detection.
- * Uses expo-location and expo-task-manager for battery-efficient background tracking.
+ * This version uses foreground location polling instead of background geofencing
+ * since Expo Go doesn't support TaskManager geofencing.
+ * 
+ * FOR TESTING ONLY - not battery efficient (polls every 30 seconds)
  */
 
 import * as Location from 'expo-location';
-import * as TaskManager from 'expo-task-manager';
 import * as Notifications from 'expo-notifications';
-import { Platform } from 'react-native';
 
-const LOCATION_TASK_NAME = 'pigeon-geofence-task';
+const CHECK_INTERVAL_MS = 30000; // Check every 30 seconds
 const NOTIFICATION_DEBOUNCE_MS = 60000; // 1 minute minimum between notifications
 
 // Configure notifications
@@ -50,9 +50,15 @@ class PigeonService {
     private static instance: PigeonService;
     private lastNotificationTime: Record<string, number> = {};
     private apiBaseUrl: string;
+    private locationSubscription: Location.LocationSubscription | null = null;
+    private checkInterval: NodeJS.Timeout | null = null;
+    private dangerZones: DangerZone[] = [];
+    private budgetUtilization: number = 0.5;
 
     private constructor() {
-        this.apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:5001';
+        // Use the environment variable, or fallback to the specific IP if needed for testing
+        this.apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://172.25.4.240:5001';
+        console.log(`🐦 [Pigeon] Service initialized with API URL: ${this.apiBaseUrl}`);
     }
 
     public static getInstance(): PigeonService {
@@ -63,7 +69,7 @@ class PigeonService {
     }
 
     /**
-     * Request necessary permissions for background location tracking
+     * Request necessary permissions (foreground only for Expo Go)
      */
     async requestPermissions(): Promise<boolean> {
         try {
@@ -81,13 +87,6 @@ class PigeonService {
                 return false;
             }
 
-            // Request background location permission (critical for geofencing)
-            const { status: backgroundStatus } = await Location.requestBackgroundPermissionsAsync();
-            if (backgroundStatus !== 'granted') {
-                console.warn('Background location permission not granted');
-                return false;
-            }
-
             return true;
         } catch (error) {
             console.error('Error requesting permissions:', error);
@@ -100,7 +99,7 @@ class PigeonService {
      */
     async fetchDangerZones(): Promise<DangerZone[]> {
         try {
-            const response = await fetch(`${this.apiBaseUrl}/api/pigeon/danger-zones`);
+            const response = await fetch(`${this.apiBaseUrl}/api/predictor/danger-zones`);
             if (!response.ok) {
                 throw new Error(`Failed to fetch danger zones: ${response.statusText}`);
             }
@@ -113,55 +112,46 @@ class PigeonService {
     }
 
     /**
-     * Start monitoring danger zones with geofencing
+     * Start monitoring (foreground polling for Expo Go)
      */
     async startMonitoring(budgetUtilization: number): Promise<void> {
         try {
+            console.log('🐦 [Pigeon] Requesting permissions...');
             const hasPermissions = await this.requestPermissions();
             if (!hasPermissions) {
-                throw new Error('Required permissions not granted');
+                throw new Error('Location or notification permissions not granted. Please enable in Settings.');
             }
+
+            console.log('✅ [Pigeon] Permissions granted');
+            this.budgetUtilization = budgetUtilization;
 
             // Fetch danger zones
-            const zones = await this.fetchDangerZones();
-            if (zones.length === 0) {
-                console.warn('No danger zones configured');
-                return;
+            console.log('🗺️ [Pigeon] Fetching danger zones...');
+            this.dangerZones = await this.fetchDangerZones();
+            if (this.dangerZones.length === 0) {
+                console.warn('⚠️ [Pigeon] No danger zones configured');
+                throw new Error('No danger zones configured on the server');
             }
 
-            console.log(`🗺️ Pigeon: Monitoring ${zones.length} danger zones`);
+            console.log(`📍 [EXPO GO MODE] Monitoring ${this.dangerZones.length} danger zones`);
+            console.log('⚠️ App must stay open for monitoring to work');
 
-            // Define the geofencing task
-            if (!TaskManager.isTaskDefined(LOCATION_TASK_NAME)) {
-                TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
-                    if (error) {
-                        console.error('Geofence task error:', error);
-                        return;
-                    }
+            // Start watching position (foreground only)
+            console.log('👀 [Pigeon] Starting location watch...');
+            this.locationSubscription = await Location.watchPositionAsync(
+                {
+                    accuracy: Location.Accuracy.Balanced,
+                    timeInterval: CHECK_INTERVAL_MS,
+                    distanceInterval: 50, // Update every 50m
+                },
+                async (location) => {
+                    await this.checkNearbyDangerZones(location.coords);
+                }
+            );
 
-                    const locationData = data as { eventType: Location.GeofencingEventType; region: Location.LocationRegion };
-
-                    if (locationData.eventType === Location.GeofencingEventType.Enter) {
-                        console.log('🚨 Entered danger zone:', locationData.region.identifier);
-                        await this.handleGeofenceEntry(locationData.region, budgetUtilization);
-                    }
-                });
-            }
-
-            // Register geofences for all danger zones
-            const geofenceRegions: Location.LocationRegion[] = zones.map(zone => ({
-                identifier: zone.merchant_name || zone.id,
-                latitude: zone.lat,
-                longitude: zone.lng,
-                radius: zone.radius || 50, // Default 50m
-                notifyOnEnter: true,
-                notifyOnExit: false,
-            }));
-
-            await Location.startGeofencingAsync(LOCATION_TASK_NAME, geofenceRegions);
-            console.log('✅ Pigeon monitoring started');
+            console.log('✅ Pigeon monitoring started (foreground mode)');
         } catch (error) {
-            console.error('Error starting Pigeon monitoring:', error);
+            console.error('❌ [Pigeon] Error starting monitoring:', error);
             throw error;
         }
     }
@@ -171,24 +161,50 @@ class PigeonService {
      */
     async stopMonitoring(): Promise<void> {
         try {
-            const hasTask = await Location.hasStartedGeofencingAsync(LOCATION_TASK_NAME);
-            if (hasTask) {
-                await Location.stopGeofencingAsync(LOCATION_TASK_NAME);
-                console.log('🛑 Pigeon monitoring stopped');
+            if (this.locationSubscription) {
+                this.locationSubscription.remove();
+                this.locationSubscription = null;
             }
+            if (this.checkInterval) {
+                clearInterval(this.checkInterval);
+                this.checkInterval = null;
+            }
+            console.log('🛑 Pigeon monitoring stopped');
         } catch (error) {
             console.error('Error stopping Pigeon monitoring:', error);
         }
     }
 
     /**
-   * Handle geofence entry event
-   */
-    private async handleGeofenceEntry(region: Location.LocationRegion, budgetUtilization: number): Promise<void> {
+     * Check if near any danger zones
+     */
+    private async checkNearbyDangerZones(coords: { latitude: number; longitude: number }): Promise<void> {
+        for (const zone of this.dangerZones) {
+            const distance = this.calculateDistance(
+                coords.latitude,
+                coords.longitude,
+                zone.lat,
+                zone.lng
+            );
+
+            if (distance < (zone.radius || 50)) {
+                console.log(`🚨 Near danger zone: ${zone.merchant_name} (${distance.toFixed(0)}m away)`);
+                await this.handleDangerZoneProximity(zone, coords);
+            }
+        }
+    }
+
+    /**
+     * Handle being near a danger zone
+     */
+    private async handleDangerZoneProximity(
+        zone: DangerZone,
+        coords: { latitude: number; longitude: number }
+    ): Promise<void> {
         try {
-            // Debounce notifications (max 1 per zone per minute)
+            // Debounce notifications
             const now = Date.now();
-            const zoneId = region.identifier || 'unknown';
+            const zoneId = zone.merchant_name || zone.id;
             const lastNotification = this.lastNotificationTime[zoneId];
             if (lastNotification && (now - lastNotification) < NOTIFICATION_DEBOUNCE_MS) {
                 console.log('⏭️ Skipping notification (debounced)');
@@ -200,10 +216,10 @@ class PigeonService {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    lat: region.latitude,
-                    lng: region.longitude,
-                    budgetUtilization,
-                    merchantCategory: 'Unknown', // Can be enriched from zone data
+                    lat: coords.latitude,
+                    lng: coords.longitude,
+                    budgetUtilization: this.budgetUtilization,
+                    merchantCategory: zone.merchant_category || 'Unknown',
                 }),
             });
 
@@ -213,7 +229,7 @@ class PigeonService {
 
             const result: LocationCheckResponse = await response.json();
 
-            // If we should notify, send local notification
+            // If we should notify, send notification
             if (result.should_notify && result.notification_message) {
                 await this.sendNotification(
                     zoneId,
@@ -223,7 +239,7 @@ class PigeonService {
                 this.lastNotificationTime[zoneId] = now;
             }
         } catch (error) {
-            console.error('Error handling geofence entry:', error);
+            console.error('Error handling danger zone proximity:', error);
         }
     }
 
@@ -256,14 +272,28 @@ class PigeonService {
     }
 
     /**
+     * Calculate distance between two coordinates (Haversine formula)
+     */
+    private calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+        const R = 6371e3; // Earth radius in meters
+        const φ1 = (lat1 * Math.PI) / 180;
+        const φ2 = (lat2 * Math.PI) / 180;
+        const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+        const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+
+        const a =
+            Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+            Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        return R * c; // Distance in meters
+    }
+
+    /**
      * Check if monitoring is active
      */
     async isMonitoring(): Promise<boolean> {
-        try {
-            return await Location.hasStartedGeofencingAsync(LOCATION_TASK_NAME);
-        } catch {
-            return false;
-        }
+        return this.locationSubscription !== null;
     }
 
     /**
@@ -283,18 +313,49 @@ class PigeonService {
             console.error('Error submitting feedback:', error);
         }
     }
+
+    /**
+     * Manual location check (for testing button)
+     */
+    async checkCurrentLocation(): Promise<LocationCheckResponse | null> {
+        try {
+            const location = await Location.getCurrentPositionAsync({
+                accuracy: Location.Accuracy.Balanced,
+            });
+
+            const response = await fetch(`${this.apiBaseUrl}/api/pigeon/check-location`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    lat: location.coords.latitude,
+                    lng: location.coords.longitude,
+                    budgetUtilization: this.budgetUtilization,
+                    merchantCategory: 'Food and Drink',
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`Location check failed: ${response.statusText}`);
+            }
+
+            return await response.json();
+        } catch (error) {
+            console.error('Error checking current location:', error);
+            return null;
+        }
+    }
 }
 
 // Export singleton instance
 export const pigeonService = PigeonService.getInstance();
 
-// Setup notification response handler (for when user taps notification)
+// Setup notification response handler
 export function setupNotificationHandler(
     onNotificationTap: (interventionId: number | undefined, zoneName: string) => void
 ) {
     Notifications.addNotificationResponseReceivedListener((response) => {
         const data = response.notification.request.content.data;
-        if (data.type === 'pigeon-intervention' && data.interventionId) {
+        if (data.type === 'pigeon-intervention') {
             onNotificationTap(data.interventionId, data.zoneName);
         }
     });

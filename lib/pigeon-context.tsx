@@ -60,7 +60,7 @@ export function PigeonProvider({ children }: { children: React.ReactNode }) {
 
     const fetchSettings = async () => {
         try {
-            const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:5001';
+            const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://172.25.4.240:5001';
             const response = await fetch(`${apiBaseUrl}/api/pigeon/settings`);
             if (response.ok) {
                 const data = await response.json();
@@ -121,7 +121,7 @@ export function PigeonProvider({ children }: { children: React.ReactNode }) {
 
     const updateSettings = async (newSettings: Partial<PigeonSettings>) => {
         try {
-            const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:5001';
+            const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://172.25.4.240:5001';
             const response = await fetch(`${apiBaseUrl}/api/pigeon/settings`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

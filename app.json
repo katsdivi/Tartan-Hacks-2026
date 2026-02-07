@@ -14,29 +14,15 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": false,
-      "bundleIdentifier": "com.pigeon.app",
-      "infoPlist": {
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "Pigeon uses your location to detect when you're near high-regret spending locations and send helpful reminders.",
-        "NSLocationWhenInUseUsageDescription": "Pigeon uses your location to detect when you're near high-regret spending locations.",
-        "UIBackgroundModes": [
-          "location"
-        ]
-      }
+      "supportsTablet": false
     },
     "android": {
-      "package": "com.pigeon.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
-      },
-      "permissions": [
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_BACKGROUND_LOCATION"
-      ]
+      }
     },
     "web": {
       "favicon": "./assets/images/favicon.png"
@@ -49,25 +35,16 @@
         }
       ],
       "expo-font",
-      "expo-web-browser",
-      [
-        "expo-location",
-        {
-          "locationAlwaysAndWhenInUsePermission": "Pigeon uses your location to detect when you're near high-regret spending locations and send helpful reminders.",
-          "isAndroidBackgroundLocationEnabled": true
-        }
-      ],
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/images/icon.png",
-          "color": "#ffffff"
-        }
-      ]
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {
+        "origin": "https://replit.com/"
+      }
     }
   }
 }

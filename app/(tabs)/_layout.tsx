@@ -106,6 +106,15 @@ function ClassicTabLayout() {
           },
         }}
       />
+      <Tabs.Screen
+        name="pigeon-test"
+        options={{
+          title: "Pigeon 🧪",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="location" size={size} color={color} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }

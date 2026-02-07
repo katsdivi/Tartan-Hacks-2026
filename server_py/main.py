@@ -191,26 +191,13 @@ stored_access_token: str | None = None
 stored_item_id: str | None = None
 
 
-class CORSMiddlewareCustom(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        origin = request.headers.get("origin", "")
-        # For debugging, log the origin and if it's considered localhost
-        print(f"CORS Request Origin: {origin}")
-        is_localhost = origin.startswith("http://localhost:") or origin.startswith("http://127.0.0.1:")
-        print(f"Is localhost: {is_localhost}")
-
-        response = await call_next(request)
-
-        # Allow all origins for local development. In production, this should be restricted.
-        response.headers["Access-Control-Allow-Origin"] = origin if origin else "*" # Allow specific origin if present, else all (for development)
-        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization" # Added Authorization header
-        response.headers["Access-Control-Allow-Credentials"] = "true" # Always allow credentials for now
-
-        return response
-
-
-app.add_middleware(CORSMiddlewareCustom)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 landing_page_path = Path(__file__).parent.parent / "server" / "templates" / "landing-page.html"
 landing_page_template = landing_page_path.read_text() if landing_page_path.exists() else "<h1>Origin Finance</h1>"
