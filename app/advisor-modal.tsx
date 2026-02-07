@@ -18,6 +18,7 @@ import * as Haptics from "expo-haptics";
 import { getApiUrl } from "@/lib/query-client";
 import { useFinance } from "@/lib/finance-context";
 import Colors from "@/constants/colors";
+import Markdown from "react-native-markdown-display";
 
 interface Message {
   id: string;
@@ -49,7 +50,47 @@ function MessageBubble({ message }: { message: Message }) {
         </View>
       )}
       <View style={[styles.bubble, isUser ? styles.userBubble : styles.assistantBubble]}>
-        <Text style={[styles.bubbleText, isUser && styles.userBubbleText]}>{message.content}</Text>
+        {isUser ? (
+          <Text style={[styles.bubbleText, styles.userBubbleText]}>{message.content}</Text>
+        ) : (
+          <Markdown
+            style={{
+              body: { color: Colors.light.text, fontSize: 15, fontFamily: "DMSans_400Regular" },
+              heading1: { fontSize: 18, fontFamily: "DMSans_700Bold", marginTop: 8, marginBottom: 4 },
+              heading2: { fontSize: 16, fontFamily: "DMSans_600SemiBold", marginTop: 6, marginBottom: 3 },
+              heading3: { fontSize: 15, fontFamily: "DMSans_600SemiBold", marginTop: 4, marginBottom: 2 },
+              strong: { fontFamily: "DMSans_700Bold" },
+              em: { fontFamily: "DMSans_400Regular", fontStyle: "italic" },
+              bullet_list: { marginTop: 4, marginBottom: 4 },
+              ordered_list: { marginTop: 4, marginBottom: 4 },
+              list_item: { marginTop: 2, marginBottom: 2 },
+              code_inline: {
+                backgroundColor: Colors.light.borderLight,
+                color: Colors.light.tint,
+                paddingHorizontal: 4,
+                paddingVertical: 2,
+                borderRadius: 4,
+                fontFamily: "Courier",
+              },
+              code_block: {
+                backgroundColor: Colors.light.borderLight,
+                padding: 8,
+                borderRadius: 6,
+                marginTop: 4,
+                marginBottom: 4,
+              },
+              fence: {
+                backgroundColor: Colors.light.borderLight,
+                padding: 8,
+                borderRadius: 6,
+                marginTop: 4,
+                marginBottom: 4,
+              },
+            }}
+          >
+            {message.content}
+          </Markdown>
+        )}
       </View>
     </View>
   );
@@ -97,27 +138,63 @@ export default function AdvisorModalScreen() {
     setShowTyping(true);
 
     try {
-      const baseUrl = getApiUrl();
-      const chatHistory = [
-        ...currentMessages.map((m) => ({ role: m.role, content: m.content })),
-        { role: "user", content: messageText },
-      ];
+      const DEDALUS_API_KEY = process.env.EXPO_PUBLIC_DEDALUS_API_KEY;
+      if (!DEDALUS_API_KEY) {
+        throw new Error("DEDALUS_API_KEY is not set in environment variables.");
+      }
+
+      const DEDALUS_API_URL = "https://api.dedaluslabs.ai/v1/chat/completions";
 
       const financialContext = getFinancialContext();
+      const system_prompt = `You are Origin, a professional AI financial advisor. You provide personalized, actionable financial guidance.
 
-      const response = await fetch(`${baseUrl}api/advisor/chat`, {
+${financialContext ? `Here is the user's current financial data:\n${financialContext}\n\nUse this data to provide specific, personalized advice.` : "The user hasn't connected their bank account yet. Encourage them to connect it for personalized advice, but still provide general financial guidance."}
+
+Guidelines:
+- Be concise but thorough
+- Give specific, actionable recommendations
+- Use numbers and percentages when relevant
+- Be encouraging but realistic
+- Format responses with clear structure
+- Never provide specific investment advice or stock picks
+- Focus on budgeting, saving, debt management, and financial planning`;
+
+
+      // Convert messages to OpenAI-compatible format for Dedalus Labs
+      const dedalusMessages = [
+        { role: 'system', content: system_prompt }
+      ];
+
+      // Append existing chat history
+      for (const message of currentMessages) {
+        dedalusMessages.push({
+          role: message.role,
+          content: message.content
+        });
+      }
+      // Add the current user message
+      dedalusMessages.push({ role: 'user', content: messageText });
+
+
+      const response = await fetch(DEDALUS_API_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Accept: "text/event-stream",
+          "Authorization": `Bearer ${DEDALUS_API_KEY}`,
         },
         body: JSON.stringify({
-          messages: chatHistory,
-          financialContext,
+          model: "openai/gpt-4o-mini",
+          messages: dedalusMessages,
+          stream: true,
+          temperature: 0.7,
         }),
       });
 
-      if (!response.ok) throw new Error("Failed to get response");
+      if (!response.ok) {
+        const errorBody = await response.text();
+        console.error("Dedalus API error response:", errorBody);
+        throw new Error(`Dedalus API returned an error: ${response.status} ${response.statusText}`);
+      }
 
       const reader = response.body?.getReader();
       if (!reader) throw new Error("No response body");
@@ -132,18 +209,24 @@ export default function AdvisorModalScreen() {
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
+        // Dedalus API uses Server-Sent Events format with "data: " prefix
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep the incomplete line in buffer
 
         for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const data = line.slice(6);
-          if (data === "[DONE]") continue;
+          const trimmedLine = line.trim();
+          if (!trimmedLine || !trimmedLine.startsWith('data: ')) continue;
+
+          const data = trimmedLine.substring(6); // Remove "data: " prefix
+          if (data === '[DONE]') continue; // Stream finished signal
 
           try {
             const parsed = JSON.parse(data);
-            if (parsed.content) {
-              fullContent += parsed.content;
+            // Extract content from OpenAI-compatible format
+            const chunkContent = parsed.choices?.[0]?.delta?.content;
+
+            if (chunkContent) {
+              fullContent += chunkContent;
 
               if (!assistantAdded) {
                 setShowTyping(false);
@@ -164,7 +247,9 @@ export default function AdvisorModalScreen() {
                 });
               }
             }
-          } catch {}
+          } catch (e) {
+            console.error("Error parsing Dedalus stream chunk:", e, data);
+          }
         }
       }
     } catch (error) {

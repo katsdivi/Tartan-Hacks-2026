@@ -7,7 +7,7 @@ import dotenv; dotenv.load_dotenv() # Add this line
 
 import random
 from datetime import date, timedelta
-import google.generativeai as genai
+
 
 
 
@@ -156,7 +156,7 @@ PLAID_CLIENT_ID = os.environ.get("PLAID_CLIENT_ID", "")
 
 PLAID_SECRET = os.environ.get("PLAID_SECRET", "")
 
-genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+
 
 
 
@@ -457,73 +457,6 @@ async def plaid_disconnect():
     return {"success": True}
 
 
-@app.post("/api/advisor/chat")
-async def advisor_chat(request: Request):
-    try:
-        body = await request.json()
-        messages = body.get("messages", [])
-        financial_context = body.get("financialContext", "")
-
-        if financial_context:
-            context_section = f"""Here is the user's current financial data:
-{financial_context}
-
-Use this data to provide specific, personalized advice."""
-        else:
-            context_section = "The user hasn't connected their bank account yet. Encourage them to connect it for personalized advice, but still provide general financial guidance."
-
-        system_prompt = f"""You are Origin, a professional AI financial advisor. You provide personalized, actionable financial guidance.
-
-{context_section}
-
-Guidelines:
-- Be concise but thorough
-- Give specific, actionable recommendations
-- Use numbers and percentages when relevant
-- Be encouraging but realistic
-- Format responses with clear structure
-- Never provide specific investment advice or stock picks
-- Focus on budgeting, saving, debt management, and financial planning"""
-
-        model = genai.GenerativeModel('gemini-flash')
-
-        async def generate():
-            try:
-                # The Gemini API uses a different message format than OpenAI,
-                # so we need to convert the messages.
-                gemini_messages = []
-                for message in messages:
-                    role = 'user' if message['role'] == 'user' else 'model'
-                    gemini_messages.append({'role': role, 'parts': [message['content']]})
-                
-                # Add the system prompt as the first message
-                gemini_messages.insert(0, {'role': 'user', 'parts': [system_prompt]})
-
-
-                stream = await model.generate_content(
-                    gemini_messages,
-                    stream=True,
-                )
-                async for chunk in stream:
-                    content = chunk.text if hasattr(chunk, 'text') and chunk.text else ""
-                    if content:
-                        yield f"data: {json.dumps({'content': content})}\n\n"
-                yield "data: [DONE]\n\n"
-            except Exception as e:
-                print(f"Streaming error: {e}")
-                yield f"data: {json.dumps({'error': 'Failed to get response'})}\n\n"
-
-        return StreamingResponse(
-            generate(),
-            media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache, no-transform",
-                "X-Accel-Buffering": "no",
-            },
-        )
-    except Exception as e:
-        print(f"AI advisor error: {e}")
-        return JSONResponse({"error": "Failed to get AI response"}, status_code=500)
 
 
 static_build_path = Path(__file__).parent.parent / "static-build"
