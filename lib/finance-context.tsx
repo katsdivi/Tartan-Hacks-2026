@@ -582,19 +582,17 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       context += `\nRecent Spending (7 days): $${totalSpending.toFixed(2)}\n`;
       context += `Number of transactions: ${transactions.length}\n`;
 
-      const topCategories: Record<string, number> = {};
-      transactions.forEach((t) => {
-        if (t.amount > 0 && t.category?.[0]) {
-          topCategories[t.category[0]] = (topCategories[t.category[0]] || 0) + t.amount;
-        }
+      // Add detailed transaction list (last 15)
+      context += "\nRecent Transactions:\n";
+      const recentTxns = [...transactions]
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .slice(0, 15);
+
+      recentTxns.forEach((t) => {
+        const loc = t.location ? ` (${t.location.city || ""}, ${t.location.region || ""})` : "";
+        const cat = t.category ? ` [${t.category.join(", ")}]` : "";
+        context += `- ${t.date}: ${t.name || t.merchant_name} $${t.amount.toFixed(2)}${cat}${loc}\n`;
       });
-      const sorted = Object.entries(topCategories).sort((a, b) => b[1] - a[1]).slice(0, 5);
-      if (sorted.length > 0) {
-        context += "\nTop spending categories:\n";
-        sorted.forEach(([cat, amount]) => {
-          context += `- ${cat}: $${amount.toFixed(2)}\n`;
-        });
-      }
     }
 
     if (budgets.length > 0) {

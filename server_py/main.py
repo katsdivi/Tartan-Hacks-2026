@@ -13,6 +13,7 @@ from datetime import date, timedelta
 
 
 from nessie_client import NessieClient
+from chat import ChatService
 from fastapi import FastAPI, Request, Response
 
 
@@ -533,6 +534,32 @@ async def customer_snapshot(customer_id: str):
         return JSONResponse({"error": f"Nessie error: {str(e)}"}, status_code=502)
 
 # --- END CAPITAL ONE NESSIE INTEGRATION ---
+
+# --- CHAT INTEGRATION ---
+chat_service = ChatService()
+
+@app.post("/api/advisor/chat")
+async def advisor_chat(request: Request):
+    try:
+        body = await request.json()
+        messages = body.get("messages", [])
+        financial_context = body.get("financialContext", "")
+        
+        async def event_generator():
+            try:
+                async for chunk in chat_service.get_response_stream(messages, financial_context):
+                    yield f"data: {json.dumps({'choices': [{'delta': {'content': chunk}}]})}\n\n"
+                yield "data: [DONE]\n\n"
+            except Exception as e:
+                print(f"Stream error: {e}")
+                error_msg = json.dumps({"error": str(e)})
+                yield f"data: {error_msg}\n\n"
+
+        return StreamingResponse(event_generator(), media_type="text/event-stream")
+    except Exception as e:
+        print(f"Chat endpoint error: {e}")
+        return JSONResponse({"error": str(e)}, status_code=500)
+# --- END CHAT INTEGRATION ---
 
 if __name__ == "__main__":
     import uvicorn
