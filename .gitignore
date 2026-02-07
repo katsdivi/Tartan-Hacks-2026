@@ -40,3 +40,9 @@ yarn-error.*
 .vercel
 
 .env
+
+# Python virtual environment
+.venv/
+
+# Quickstart directory (likely example/temporary project)
+quickstart/

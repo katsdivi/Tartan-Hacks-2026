@@ -3,6 +3,7 @@ import json
 import asyncio
 from datetime import datetime, timedelta
 from pathlib import Path
+import dotenv; dotenv.load_dotenv() # Add this line
 
 import google.generativeai as genai
 
@@ -42,6 +43,7 @@ from plaid.model.products import Products
 
 from plaid.model.country_code import CountryCode
 
+import requests # Added for debugging
 
 
 app = FastAPI()
@@ -85,16 +87,6 @@ class CORSMiddlewareCustom(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         origin = request.headers.get("origin", "")
 
-        allowed_origins: set[str] = set()
-        dev_domain = os.environ.get("REPLIT_DEV_DOMAIN")
-        if dev_domain:
-            allowed_origins.add(f"https://{dev_domain}")
-
-        replit_domains = os.environ.get("REPLIT_DOMAINS", "")
-        if replit_domains:
-            for d in replit_domains.split(","):
-                allowed_origins.add(f"https://{d.strip()}")
-
         is_localhost = origin.startswith("http://localhost:") or origin.startswith("http://127.0.0.1:")
 
         if request.method == "OPTIONS":
@@ -102,7 +94,7 @@ class CORSMiddlewareCustom(BaseHTTPMiddleware):
         else:
             response = await call_next(request)
 
-        if origin and (origin in allowed_origins or is_localhost):
+        if is_localhost:
             response.headers["Access-Control-Allow-Origin"] = origin
             response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
             response.headers["Access-Control-Allow-Headers"] = "Content-Type"
@@ -158,9 +150,23 @@ async def root(request: Request):
     return HTMLResponse(html)
 
 
+@app.get("/health")
+def health():
+    return {"ok": True}
+
+
 @app.post("/api/plaid/create-link-token")
 async def create_link_token():
+    print(f"Plaid Configuration: {configuration}")
     try:
+        # Test basic requests connectivity
+        try:
+            print("Attempting requests.get to sandbox.plaid.com...")
+            requests_response = requests.get("https://sandbox.plaid.com")
+            print(f"requests.get to sandbox.plaid.com successful. Status: {requests_response.status_code}")
+        except Exception as req_e:
+            print(f"requests.get to sandbox.plaid.com failed: {req_e}")
+            
         request = LinkTokenCreateRequest(
             user=LinkTokenCreateRequestUser(client_user_id="user-1"),
             client_name="Origin Finance",

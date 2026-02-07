@@ -12,11 +12,15 @@ if ! docker info > /dev/null 2>&1; then
 fi
 
 # --- Python Dependencies ---
-echo "Step 1: Installing uv..."
-pip install uv
+echo "Step 1: Setting up Python virtual environment..."
+rm -rf .venv
+python3 -m venv .venv
 
-echo "Step 2: Syncing Python dependencies..."
-uv sync
+echo "Step 2: Installing uv in virtual environment..."
+./.venv/bin/pip install uv
+
+echo "Step 3: Syncing Python dependencies..."
+./.venv/bin/uv sync
 
 # --- Node.js Dependencies ---
 echo "Step 3: Installing Node.js dependencies..."
@@ -28,6 +32,14 @@ docker-compose down -v
 
 echo "Step 5: Starting the database..."
 docker-compose up -d
+
+# Wait for PostgreSQL to be ready
+echo "Waiting for PostgreSQL to be ready..."
+until docker exec financial-advisor-ai-postgres-1 pg_isready -U postgres; do
+  echo "PostgreSQL is unavailable - sleeping"
+  sleep 1
+done
+echo "PostgreSQL is up and running!"
 
 echo "Step 6: Applying the database schema..."
 npm run db:push

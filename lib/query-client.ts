@@ -6,15 +6,9 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
  * @returns {string} The API base URL
  */
 export function getApiUrl(): string {
-  let host = process.env.EXPO_PUBLIC_DOMAIN;
-
-  if (!host) {
-    throw new Error("EXPO_PUBLIC_DOMAIN is not set");
-  }
-
-  let url = new URL(`https://${host}`);
-
-  return url.href;
+  const API_BASE_URL =
+    process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://172.25.4.240:5001";
+  return API_BASE_URL;
 }
 
 async function throwIfResNotOk(res: Response) {
@@ -31,6 +25,9 @@ export async function apiRequest(
 ): Promise<Response> {
   const baseUrl = getApiUrl();
   const url = new URL(route, baseUrl);
+
+  console.log("API_BASE_URL =", baseUrl);
+  console.log("Full fetch URL =", url.toString());
 
   const res = await fetch(url.toString(), {
     method,

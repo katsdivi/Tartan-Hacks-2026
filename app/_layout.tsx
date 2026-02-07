@@ -9,8 +9,6 @@ import { queryClient } from "@/lib/query-client";
 import { FinanceProvider } from "@/lib/finance-context";
 import { useFonts, DMSans_400Regular, DMSans_500Medium, DMSans_600SemiBold, DMSans_700Bold } from "@expo-google-fonts/dm-sans";
 
-SplashScreen.preventAutoHideAsync();
-
 function RootLayoutNav() {
   return (
     <Stack screenOptions={{ headerBackTitle: "Back" }}>
@@ -28,6 +26,11 @@ export default function RootLayout() {
     DMSans_600SemiBold,
     DMSans_700Bold,
   });
+
+  useEffect(() => {
+    // Prevent the splash screen from auto-hiding until fonts are loaded
+    SplashScreen.preventAutoHideAsync();
+  }, []);
 
   useEffect(() => {
     if (fontsLoaded) {

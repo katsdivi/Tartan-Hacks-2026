@@ -1,2 +1,2 @@
 #!/bin/bash
-exec python3 server_py/main.py
+exec python server_py/main.py

@@ -8,6 +8,7 @@ import {
   RefreshControl,
   Platform,
   Modal,
+  Button,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
@@ -134,6 +135,11 @@ export default function DashboardScreen() {
     transactions, refreshData, connectionError, dismissError, loadDemoData,
   } = useFinance();
 
+  const checkHealth = () => {
+    const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://172.25.4.240:5001";
+    fetch(`${API_BASE_URL}/health`).then(r => r.json()).then(console.log).catch(console.error)
+  };
+
   useEffect(() => {
     refreshData();
   }, []);
@@ -178,6 +184,7 @@ export default function DashboardScreen() {
 
       <View style={styles.header}>
         <Text style={styles.greeting}>Dashboard</Text>
+        <Button title="Health Check" onPress={checkHealth} />
         {isConnected && (
           <View style={styles.connectedBadge}>
             <View style={styles.glowDot} />
