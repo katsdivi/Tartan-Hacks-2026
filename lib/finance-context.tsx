@@ -196,6 +196,9 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   }, []); // Run once on mount
 
   const checkSurveyStatus = async () => {
+    // DISABLED: Always show survey on app start for demo purposes
+    // To re-enable persistence, uncomment the code below:
+    /*
     try {
       const stored = await AsyncStorage.getItem("isSurveyCompleted");
       const analysis = await AsyncStorage.getItem("surveyAnalysis");
@@ -206,6 +209,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         setSurveyAnalysis(JSON.parse(analysis));
       }
     } catch { }
+    */
   };
 
   const completeSurvey = useCallback(async (analysis: any) => {

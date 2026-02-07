@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import Svg, { Circle } from "react-native-svg";
 import { useFinance } from "@/lib/finance-context";
 import Colors from "@/constants/colors";
 import FinanceTip from "@/components/FinanceTip";
@@ -183,26 +184,45 @@ export default function BudgetScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refreshData} tintColor={Colors.light.tint} />}
       >
+        {/* Circular Spending Graph */}
         <View style={styles.totalCard}>
-          <View style={styles.totalHeader}>
-            <Text style={styles.totalLabel}>Total Spending</Text>
-            <Text style={[styles.totalPercent, totalProgress > 0.9 && { color: Colors.light.negative }]}>
-              {Math.round(totalProgress * 100)}%
-            </Text>
+          <View style={styles.circularContainer}>
+            <Svg width={160} height={160} viewBox="0 0 160 160">
+              {/* Background circle */}
+              <Circle
+                cx="80"
+                cy="80"
+                r="65"
+                stroke={Colors.light.borderLight}
+                strokeWidth="12"
+                fill="none"
+              />
+              {/* Progress circle */}
+              <Circle
+                cx="80"
+                cy="80"
+                r="65"
+                stroke={totalProgress > 0.9 ? Colors.light.negative : Colors.light.tint}
+                strokeWidth="12"
+                fill="none"
+                strokeLinecap="round"
+                strokeDasharray={`${Math.min(totalProgress, 1) * 408} 408`}
+                transform="rotate(-90 80 80)"
+              />
+            </Svg>
+            {/* Center Text */}
+            <View style={styles.circularCenter}>
+              <Text style={[styles.circularPercent, totalProgress > 0.9 && { color: Colors.light.negative }]}>
+                {Math.round(totalProgress * 100)}%
+              </Text>
+              <Text style={styles.circularLabel}>spent</Text>
+            </View>
           </View>
-          <Text style={styles.totalAmount}>
-            ${totalSpent.toFixed(0)} <Text style={styles.totalOf}>of ${totalBudget.toFixed(0)}</Text>
-          </Text>
-          <View style={styles.totalProgressBg}>
-            <View
-              style={[
-                styles.totalProgressFill,
-                {
-                  width: `${Math.min(Math.round(totalProgress * 100), 100)}%`,
-                  backgroundColor: totalProgress > 0.9 ? Colors.light.negative : Colors.light.tint,
-                },
-              ]}
-            />
+          <View style={styles.totalInfo}>
+            <Text style={styles.totalAmount}>
+              ${totalSpent.toFixed(0)}
+            </Text>
+            <Text style={styles.totalOf}>of ${totalBudget.toFixed(0)} budget</Text>
           </View>
         </View>
 
@@ -604,4 +624,73 @@ const styles = StyleSheet.create({
     fontFamily: "DMSans_600SemiBold",
     color: Colors.light.background,
   },
+  // Trend Graph Styles
+  trendCard: {
+    backgroundColor: Colors.light.surface,
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+  },
+  trendTitle: {
+    fontSize: 14,
+    fontFamily: "DMSans_600SemiBold",
+    color: Colors.light.textSecondary,
+    marginBottom: 16,
+  },
+  trendBars: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+    height: 80,
+  },
+  trendBarCol: {
+    flex: 1,
+    alignItems: "center",
+    gap: 8,
+  },
+  trendBarWrap: {
+    flex: 1,
+    width: 20,
+    justifyContent: "flex-end",
+    borderRadius: 10,
+    overflow: "hidden",
+    backgroundColor: Colors.light.borderLight,
+  },
+  trendBar: {
+    width: "100%",
+    borderRadius: 10,
+  },
+  trendDayLabel: {
+    fontSize: 11,
+    fontFamily: "DMSans_500Medium",
+    color: Colors.light.textTertiary,
+  },
+  // Circular Graph Styles
+  circularContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  circularCenter: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  circularPercent: {
+    fontSize: 32,
+    fontFamily: 'DMSans_700Bold',
+    color: Colors.light.tint,
+  },
+  circularLabel: {
+    fontSize: 14,
+    fontFamily: 'DMSans_400Regular',
+    color: Colors.light.textSecondary,
+  },
+  totalInfo: {
+    alignItems: 'center',
+    marginTop: 16,
+  },
 });
+

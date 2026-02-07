@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState } from "react";
 import {
   StyleSheet,
   Text,
@@ -10,6 +10,9 @@ import {
   Modal,
   Button,
 } from "react-native";
+import Animated, {
+  FadeInUp,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -18,6 +21,40 @@ import { useFinance } from "@/lib/finance-context";
 import Colors from "@/constants/colors";
 import FinanceTip from "@/components/FinanceTip";
 import { AnalyticsBlock } from "@/components/AnalyticsBlock";
+
+// Animated number component for count-up effect
+function AnimatedNumber({ value, prefix = "", suffix = "", style, duration = 800 }: {
+  value: number;
+  prefix?: string;
+  suffix?: string;
+  style?: any;
+  duration?: number;
+}) {
+  const [displayValue, setDisplayValue] = useState(0);
+
+  useEffect(() => {
+    const startTime = Date.now();
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+      setDisplayValue(Math.round(value * eased));
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      }
+    };
+    requestAnimationFrame(animate);
+  }, [value, duration]);
+
+  const formatted = Math.abs(displayValue) >= 1000000
+    ? `${prefix}$${(displayValue / 1000000).toFixed(1)}M${suffix}`
+    : Math.abs(displayValue) >= 1000
+      ? `${prefix}$${(displayValue / 1000).toFixed(1)}K${suffix}`
+      : `${prefix}$${displayValue.toLocaleString()}${suffix}`;
+
+  return <Text style={style}>{formatted}</Text>;
+}
+
 
 const DEMO_MODE_ENV = process.env.EXPO_PUBLIC_DEMO_MODE === "1";
 
@@ -364,9 +401,9 @@ export default function DashboardScreen() {
         </>
       ) : (
         <>
-          <View style={styles.netWorthCard}>
+          <Animated.View entering={FadeInUp.duration(400)} style={styles.netWorthCard}>
             <Text style={styles.netWorthLabel}>Net Worth</Text>
-            <Text style={styles.netWorthValue}>{formatCurrency(totalNetWorth)}</Text>
+            <AnimatedNumber value={totalNetWorth} style={styles.netWorthValue} duration={1000} />
             <View style={styles.changeRow}>
               <Ionicons
                 name={monthlyChange >= 0 ? "arrow-up" : "arrow-down"}
@@ -394,7 +431,7 @@ export default function DashboardScreen() {
                 </View>
               </View>
             </View>
-          </View>
+          </Animated.View>
 
           <View style={styles.statsRow}>
             <View style={styles.statCard}>

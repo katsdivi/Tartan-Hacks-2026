@@ -1,0 +1,91 @@
+
+> expo-app@1.0.0 server:dev
+> PORT=5001 NODE_ENV=development tsx server/index.ts
+
+/Users/abhinavkumar/Desktop/Final version/Tartan-Hacks-2026/server_py/main.py:890: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("startup")
+INFO:     Started server process [22228]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:5001 (Press CTRL+C to quit)
+INFO:     127.0.0.1:51387 - "GET /api/plaid/status HTTP/1.1" 200 OK
+INFO:     172.25.1.29:51453 - "GET /api/pigeon/settings HTTP/1.1" 200 OK
+INFO:     172.25.1.29:51454 - "GET /api/predictor/danger-zones HTTP/1.1" 200 OK
+INFO:     172.25.1.29:51456 - "GET /api/plaid/status HTTP/1.1" 200 OK
+INFO:     172.25.1.29:51457 - "GET /api/pigeon/settings HTTP/1.1" 200 OK
+INFO:     172.25.1.29:51458 - "GET /api/predictor/danger-zones HTTP/1.1" 200 OK
+INFO:     172.25.1.29:51457 - "GET /api/predictor/danger-zones HTTP/1.1" 200 OK
+INFO:     172.25.1.29:51458 - "GET /api/predictor/danger-zones HTTP/1.1" 200 OK
+INFO:     172.25.1.29:51457 - "GET /api/predictor/danger-zones HTTP/1.1" 200 OK
+INFO:     172.25.1.29:51457 - "GET /api/predictor/danger-zones HTTP/1.1" 200 OK
+INFO:     172.25.1.29:51455 - "GET /api/capitalone/customers HTTP/1.1" 502 Bad Gateway
+INFO:     172.25.1.29:51458 - "GET /api/capitalone/customers HTTP/1.1" 502 Bad Gateway
+INFO:     172.25.1.29:51455 - "GET /api/capitalone/customers HTTP/1.1" 502 Bad Gateway
+INFO:     172.25.1.29:51458 - "GET /api/capitalone/customers HTTP/1.1" 502 Bad Gateway
+INFO:     172.25.1.29:51458 - "GET /api/capitalone/customers HTTP/1.1" 502 Bad Gateway
+INFO:     172.25.1.29:51497 - "OPTIONS /api/advisor/survey-analysis HTTP/1.1" 200 OK
+INFO:     172.25.1.29:51498 - "POST /api/advisor/survey-analysis HTTP/1.1" 200 OK
+INFO:     172.25.1.29:51522 - "POST /api/advisor/survey-analysis HTTP/1.1" 200 OK
+INFO:     172.25.1.29:51540 - "POST /api/advisor/survey-analysis HTTP/1.1" 200 OK
+INFO:     172.25.6.168:54712 - "GET /api/predictor/danger-zones HTTP/1.1" 200 OK
+INFO:     172.25.6.168:54714 - "GET /api/predictor/danger-zones HTTP/1.1" 200 OK
+INFO:     172.25.6.168:54711 - "GET /api/pigeon/settings HTTP/1.1" 200 OK
+INFO:     172.25.6.168:54716 - "GET /api/plaid/status HTTP/1.1" 200 OK
+INFO:     172.25.6.168:54717 - "GET /api/pigeon/settings HTTP/1.1" 200 OK
+INFO:     172.25.6.168:54715 - "GET /api/capitalone/customers HTTP/1.1" 502 Bad Gateway
+INFO:     172.25.6.168:54712 - "GET /api/predictor/danger-zones HTTP/1.1" 200 OK
+INFO:     172.25.6.168:54714 - "GET /api/predictor/danger-zones HTTP/1.1" 200 OK
+INFO:     172.25.6.168:54711 - "GET /api/plaid/accounts HTTP/1.1" 200 OK
+INFO:     172.25.6.168:54717 - "GET /api/capitalone/customers HTTP/1.1" 502 Bad Gateway
+INFO:     172.25.6.168:54711 - "GET /api/plaid/transactions HTTP/1.1" 200 OK
+Generating behavioral summary...
+INFO:     172.25.6.168:54711 - "POST /api/advisor/insights HTTP/1.1" 200 OK
+INFO:     172.25.6.168:54719 - "POST /api/advisor/survey-analysis HTTP/1.1" 200 OK
+INFO:     172.25.6.168:54719 - "GET /api/plaid/status HTTP/1.1" 200 OK
+INFO:     172.25.6.168:54719 - "GET /api/plaid/accounts HTTP/1.1" 200 OK
+INFO:     172.25.6.168:54719 - "GET /api/plaid/transactions HTTP/1.1" 200 OK
+Generating behavioral summary...
+INFO:     172.25.6.168:54719 - "POST /api/advisor/insights HTTP/1.1" 200 OK
+INFO:     172.25.6.168:54719 - "GET /api/plaid/status HTTP/1.1" 200 OK
+INFO:     172.25.6.168:54719 - "GET /api/plaid/accounts HTTP/1.1" 200 OK
+INFO:     172.25.6.168:54720 - "GET /api/plaid/status HTTP/1.1" 200 OK
+INFO:     172.25.6.168:54719 - "GET /api/plaid/transactions HTTP/1.1" 200 OK
+INFO:     172.25.6.168:54720 - "GET /api/plaid/accounts HTTP/1.1" 200 OK
+Generating behavioral summary...
+INFO:     172.25.6.168:54720 - "GET /api/plaid/transactions HTTP/1.1" 200 OK
+Generating behavioral summary...
+INFO:     172.25.6.168:54719 - "POST /api/advisor/insights HTTP/1.1" 200 OK
+INFO:     172.25.6.168:54721 - "POST /api/predictor/predict HTTP/1.1" 200 OK
+INFO:     172.25.6.168:54722 - "GET /api/finance/recurring-payments?account_id=demo_checking HTTP/1.1" 200 OK
+INFO:     172.25.6.168:54723 - "GET /api/pigeon/risk-score?lat=40.44340465528554&lng=-79.94162907489428 HTTP/1.1" 200 OK
+INFO:     172.25.6.168:54720 - "POST /api/advisor/insights HTTP/1.1" 200 OK
+INFO:     172.25.6.168:54725 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.25.6.168:54725 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.25.6.168:54726 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.25.6.168:54727 - "POST /api/pigeon/check-location HTTP/1.1" 200 OK
+INFO:     172.25.6.168:54727 - "GET /api/predictor/danger-zones HTTP/1.1" 200 OK
+INFO:     172.25.6.168:54727 - "POST /api/pigeon/settings HTTP/1.1" 200 OK
+INFO:     172.25.6.168:54727 - "POST /api/pigeon/settings HTTP/1.1" 200 OK
+INFO:     172.25.1.29:53298 - "GET /api/pigeon/settings HTTP/1.1" 200 OK
+INFO:     172.25.1.29:53299 - "GET /api/predictor/danger-zones HTTP/1.1" 200 OK
+INFO:     172.25.1.29:53302 - "GET /api/plaid/status HTTP/1.1" 200 OK
+INFO:     172.25.1.29:53298 - "GET /api/pigeon/settings HTTP/1.1" 200 OK
+INFO:     172.25.1.29:53305 - "GET /api/predictor/danger-zones HTTP/1.1" 200 OK
+INFO:     172.25.1.29:53305 - "GET /api/predictor/danger-zones HTTP/1.1" 200 OK
+INFO:     172.25.1.29:53298 - "GET /api/predictor/danger-zones HTTP/1.1" 200 OK
+INFO:     172.25.1.29:53298 - "GET /api/predictor/danger-zones HTTP/1.1" 200 OK
+INFO:     172.25.1.29:53301 - "GET /api/capitalone/customers HTTP/1.1" 502 Bad Gateway
+INFO:     172.25.1.29:53305 - "GET /api/capitalone/customers HTTP/1.1" 502 Bad Gateway
+INFO:     172.25.1.29:53301 - "GET /api/capitalone/customers HTTP/1.1" 502 Bad Gateway
+INFO:     172.25.1.29:53305 - "GET /api/capitalone/customers HTTP/1.1" 502 Bad Gateway
+INFO:     172.25.1.29:53305 - "GET /api/capitalone/customers HTTP/1.1" 502 Bad Gateway
+INFO:     172.25.1.29:53354 - "OPTIONS /api/advisor/survey-analysis HTTP/1.1" 200 OK
+INFO:     172.25.1.29:53355 - "POST /api/advisor/survey-analysis HTTP/1.1" 200 OK
+INFO:     172.25.1.29:53445 - "POST /api/advisor/survey-analysis HTTP/1.1" 200 OK
+INFO:     172.25.1.29:53459 - "POST /api/advisor/survey-analysis HTTP/1.1" 200 OK
+Python server exited with code null

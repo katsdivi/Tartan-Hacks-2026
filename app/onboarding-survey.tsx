@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
     View,
     Text,
@@ -8,10 +8,20 @@ import {
     ActivityIndicator,
     Alert,
 } from "react-native";
+import Animated, {
+    useSharedValue,
+    useAnimatedStyle,
+    withSpring,
+    withTiming,
+    interpolate,
+    runOnJS,
+    Easing,
+} from "react-native-reanimated";
 import { router } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import Slider from "@react-native-community/slider";
+import { BlurView } from "expo-blur";
 import Colors from "@/constants/colors";
 import { useFinance } from "@/lib/finance-context";
 import { apiRequest } from "@/lib/query-client";
@@ -45,7 +55,7 @@ const QUESTIONS: Question[] = [
         category: "Finances",
         text: "How much financial flexibility do you feel you have month to month?",
         minLabel: "Very Tight",
-        maxLabel: "Examples: Rent, Utilities, Grocery vs Income",
+        maxLabel: "Very Flexible",
     },
     // Behavioral
     {
@@ -88,13 +98,13 @@ const QUESTIONS: Question[] = [
         id: 7,
         type: "choice",
         category: "Emotional",
-        text: "Which situations do you most often wish you’d spent a little less?",
+        text: "Which situations do you most often wish you'd spent a little less?",
         options: [
             "After a stressful day",
-            "When I’m bored",
+            "When I'm bored",
             "During social situations",
             "During celebrations",
-            "When I’m craving something",
+            "When I'm craving something",
         ],
     },
     // Goals
@@ -146,10 +156,153 @@ const QUESTIONS: Question[] = [
         options: [
             "Very strict — reaching goal fast matters most",
             "Balanced — progress matters, but so does flexibility",
-            "Relaxed — I don’t mind slower progress",
+            "Relaxed — I don't mind slower progress",
         ],
     },
 ];
+
+// Liquid Glass Slider Component
+function LiquidGlassSlider({
+    value,
+    onValueChange,
+    minLabel,
+    maxLabel
+}: {
+    value: number;
+    onValueChange: (val: number) => void;
+    minLabel: string;
+    maxLabel: string;
+}) {
+    const [currentValue, setCurrentValue] = useState(value);
+    const thumbPosition = useSharedValue(value / 100);
+
+    const handleValueChange = (val: number) => {
+        setCurrentValue(val);
+        thumbPosition.value = val / 100;
+    };
+
+    const handleSlidingComplete = (val: number) => {
+        onValueChange(val);
+    };
+
+    const tooltipAnimatedStyle = useAnimatedStyle(() => ({
+        left: `${thumbPosition.value * 100}%`,
+        transform: [{ translateX: -30 }],
+    }));
+
+    return (
+        <View style={sliderStyles.container}>
+            <View style={sliderStyles.labelsRow}>
+                <Text style={sliderStyles.label}>{minLabel}</Text>
+                <Text style={sliderStyles.label}>{maxLabel}</Text>
+            </View>
+
+            <View style={sliderStyles.sliderWrapper}>
+                {/* Glass Tooltip that follows thumb */}
+                <Animated.View style={[sliderStyles.tooltipContainer, tooltipAnimatedStyle]}>
+                    <BlurView intensity={40} tint="dark" style={sliderStyles.tooltip}>
+                        <Text style={sliderStyles.tooltipText}>{Math.round(currentValue)}%</Text>
+                    </BlurView>
+                </Animated.View>
+
+                {/* Custom track background with glass effect */}
+                <View style={sliderStyles.trackBackground}>
+                    <LinearGradient
+                        colors={[Colors.light.tint, Colors.light.gradient2]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={[sliderStyles.trackFill, { width: `${currentValue}%` }]}
+                    />
+                </View>
+
+                <Slider
+                    style={sliderStyles.slider}
+                    minimumValue={0}
+                    maximumValue={100}
+                    step={1}
+                    value={currentValue}
+                    onValueChange={handleValueChange}
+                    onSlidingComplete={handleSlidingComplete}
+                    minimumTrackTintColor="transparent"
+                    maximumTrackTintColor="transparent"
+                    thumbTintColor={Colors.light.tint}
+                />
+            </View>
+
+            {/* Large centered value display */}
+            <View style={sliderStyles.valueDisplay}>
+                <Text style={sliderStyles.valueText}>{Math.round(currentValue)}%</Text>
+            </View>
+        </View>
+    );
+}
+
+const sliderStyles = StyleSheet.create({
+    container: {
+        marginTop: 20,
+        gap: 16,
+    },
+    labelsRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+    },
+    label: {
+        fontSize: 13,
+        fontFamily: "DMSans_500Medium",
+        color: Colors.light.textSecondary,
+    },
+    sliderWrapper: {
+        position: 'relative',
+        height: 60,
+        justifyContent: 'center',
+    },
+    tooltipContainer: {
+        position: 'absolute',
+        top: 0,
+        width: 60,
+        zIndex: 10,
+    },
+    tooltip: {
+        borderRadius: 12,
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        alignItems: 'center',
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: Colors.light.glassBorder,
+    },
+    tooltipText: {
+        fontSize: 14,
+        fontFamily: "DMSans_700Bold",
+        color: Colors.light.tint,
+    },
+    trackBackground: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: Colors.light.border,
+        overflow: 'hidden',
+    },
+    trackFill: {
+        height: '100%',
+        borderRadius: 4,
+    },
+    slider: {
+        width: '100%',
+        height: 40,
+    },
+    valueDisplay: {
+        alignItems: 'center',
+        marginTop: 8,
+    },
+    valueText: {
+        fontSize: 36,
+        fontFamily: "DMSans_700Bold",
+        color: Colors.light.tint,
+    },
+});
 
 export default function OnboardingSurveyScreen() {
     const insets = useSafeAreaInsets();
@@ -157,9 +310,15 @@ export default function OnboardingSurveyScreen() {
     const [answers, setAnswers] = useState<Record<number, any>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [currentStep, setCurrentStep] = useState(0);
+    const [isAnimating, setIsAnimating] = useState(false);
+
+    // Animation values
+    const translateX = useSharedValue(0);
+    const opacity = useSharedValue(1);
+    const scale = useSharedValue(1);
 
     // If already completed, shouldn't really remain here, but for safety:
-    React.useEffect(() => {
+    useEffect(() => {
         if (isSurveyCompleted) {
             router.replace("/(tabs)");
         }
@@ -183,17 +342,38 @@ export default function OnboardingSurveyScreen() {
         setAnswers((prev) => ({ ...prev, [questionId]: value }));
     };
 
+    const animateTransition = useCallback((direction: 'next' | 'prev', callback: () => void) => {
+        setIsAnimating(true);
+        const exitX = direction === 'next' ? -100 : 100;
+        const enterX = direction === 'next' ? 100 : -100;
+
+        // Exit animation
+        opacity.value = withTiming(0, { duration: 150 });
+        translateX.value = withTiming(exitX, { duration: 200 }, () => {
+            runOnJS(callback)();
+            // Reset position for entry
+            translateX.value = enterX;
+            // Entry animation
+            translateX.value = withSpring(0, { damping: 20, stiffness: 200 });
+            opacity.value = withTiming(1, { duration: 200 }, () => {
+                runOnJS(setIsAnimating)(false);
+            });
+        });
+    }, []);
+
     const nextStep = () => {
+        if (isAnimating) return;
         if (currentStep < QUESTIONS.length - 1) {
-            setCurrentStep(currentStep + 1);
+            animateTransition('next', () => setCurrentStep(currentStep + 1));
         } else {
             submitSurvey();
         }
     };
 
     const prevStep = () => {
+        if (isAnimating) return;
         if (currentStep > 0) {
-            setCurrentStep(currentStep - 1);
+            animateTransition('prev', () => setCurrentStep(currentStep - 1));
         }
     };
 
@@ -231,6 +411,11 @@ export default function OnboardingSurveyScreen() {
     const currentQ = QUESTIONS[currentStep];
     const progress = ((currentStep + 1) / QUESTIONS.length) * 100;
 
+    const contentAnimatedStyle = useAnimatedStyle(() => ({
+        transform: [{ translateX: translateX.value }],
+        opacity: opacity.value,
+    }));
+
     return (
         <View style={[styles.container, { paddingTop: insets.top }]}>
             <View style={styles.header}>
@@ -248,78 +433,75 @@ export default function OnboardingSurveyScreen() {
             </View>
 
             <ScrollView contentContainerStyle={styles.content}>
-                <Text style={styles.category}>{currentQ.category}</Text>
-                <Text style={styles.questionText}>{currentQ.text}</Text>
+                <Animated.View style={contentAnimatedStyle}>
+                    <Text style={styles.category}>{currentQ.category}</Text>
+                    <Text style={styles.questionText}>{currentQ.text}</Text>
 
-                {currentQ.type === "choice" && currentQ.options?.map((option) => (
-                    <Pressable
-                        key={option}
-                        style={[
-                            styles.optionButton,
-                            answers[currentQ.id] === option && styles.optionSelected,
-                        ]}
-                        onPress={() => handleSelect(currentQ.id, option)}
-                    >
-                        <Text
-                            style={[
-                                styles.optionText,
-                                answers[currentQ.id] === option && styles.optionTextSelected,
-                            ]}
-                        >
-                            {option}
-                        </Text>
-                        {answers[currentQ.id] === option && (
-                            <Ionicons name="checkmark-circle" size={24} color={Colors.light.background} />
-                        )}
-                    </Pressable>
-                ))}
-
-                {currentQ.type === "multi-choice" && currentQ.options?.map((option) => {
-                    const isSelected = (answers[currentQ.id] as string[] || []).includes(option);
-                    return (
-                        <Pressable
+                    {currentQ.type === "choice" && currentQ.options?.map((option, index) => (
+                        <Animated.View
                             key={option}
-                            style={[
-                                styles.optionButton,
-                                isSelected && styles.optionSelected,
-                            ]}
-                            onPress={() => handleMultiSelect(currentQ.id, option)}
+                            style={{
+                                opacity: 1,
+                                transform: [{ translateY: 0 }],
+                            }}
                         >
-                            <Text
+                            <Pressable
                                 style={[
-                                    styles.optionText,
-                                    isSelected && styles.optionTextSelected,
+                                    styles.optionButton,
+                                    answers[currentQ.id] === option && styles.optionSelected,
                                 ]}
+                                onPress={() => handleSelect(currentQ.id, option)}
                             >
-                                {option}
-                            </Text>
-                            {isSelected && (
-                                <Ionicons name="checkbox" size={24} color={Colors.light.background} />
-                            )}
-                        </Pressable>
-                    );
-                })}
+                                <Text
+                                    style={[
+                                        styles.optionText,
+                                        answers[currentQ.id] === option && styles.optionTextSelected,
+                                    ]}
+                                >
+                                    {option}
+                                </Text>
+                                {answers[currentQ.id] === option && (
+                                    <Ionicons name="checkmark-circle" size={24} color={Colors.light.background} />
+                                )}
+                            </Pressable>
+                        </Animated.View>
+                    ))}
 
-                {currentQ.type === "slider" && (
-                    <View style={styles.sliderContainer}>
-                        <View style={styles.sliderLabels}>
-                            <Text style={styles.sliderLabel}>{currentQ.minLabel || "Low"}</Text>
-                            <Text style={styles.sliderLabel}>{currentQ.maxLabel || "High"}</Text>
-                        </View>
-                        <Slider
-                            style={{ width: '100%', height: 40 }}
-                            minimumValue={0}
-                            maximumValue={100}
-                            step={1}
+                    {currentQ.type === "multi-choice" && currentQ.options?.map((option) => {
+                        const isSelected = (answers[currentQ.id] as string[] || []).includes(option);
+                        return (
+                            <Pressable
+                                key={option}
+                                style={[
+                                    styles.optionButton,
+                                    isSelected && styles.optionSelected,
+                                ]}
+                                onPress={() => handleMultiSelect(currentQ.id, option)}
+                            >
+                                <Text
+                                    style={[
+                                        styles.optionText,
+                                        isSelected && styles.optionTextSelected,
+                                    ]}
+                                >
+                                    {option}
+                                </Text>
+                                {isSelected && (
+                                    <Ionicons name="checkbox" size={24} color={Colors.light.background} />
+                                )}
+                            </Pressable>
+                        );
+                    })}
+
+                    {currentQ.type === "slider" && (
+                        <LiquidGlassSlider
                             value={answers[currentQ.id] ?? 50}
-                            onSlidingComplete={(val) => handleSlider(currentQ.id, val)}
-                            minimumTrackTintColor={Colors.light.tint}
-                            maximumTrackTintColor={Colors.light.border}
-                            thumbTintColor={Colors.light.tint}
+                            onValueChange={(val) => handleSlider(currentQ.id, val)}
+                            minLabel={currentQ.minLabel || "Low"}
+                            maxLabel={currentQ.maxLabel || "High"}
                         />
-                        <Text style={styles.sliderValueText}>{Math.round(answers[currentQ.id] ?? 50)}%</Text>
-                    </View>
-                )}
+                    )}
+                </Animated.View>
             </ScrollView>
 
             <View style={[styles.footer, { paddingBottom: insets.bottom + 20 }]}>
@@ -327,15 +509,15 @@ export default function OnboardingSurveyScreen() {
                     <Pressable
                         style={[styles.navButton, styles.backButton, currentStep === 0 && { opacity: 0.3 }]}
                         onPress={prevStep}
-                        disabled={currentStep === 0}
+                        disabled={currentStep === 0 || isAnimating}
                     >
                         <Text style={styles.backButtonText}>Back</Text>
                     </Pressable>
 
                     <Pressable
-                        style={[styles.navButton, styles.nextButton, (!canProceed() || isSubmitting) && { opacity: 0.5 }]}
+                        style={[styles.navButton, styles.nextButton, (!canProceed() || isSubmitting || isAnimating) && { opacity: 0.5 }]}
                         onPress={nextStep}
-                        disabled={!canProceed() || isSubmitting}
+                        disabled={!canProceed() || isSubmitting || isAnimating}
                     >
                         {isSubmitting ? (
                             <ActivityIndicator color={Colors.light.background} />
@@ -422,26 +604,6 @@ const styles = StyleSheet.create({
     optionTextSelected: {
         color: Colors.light.background,
         fontWeight: "600",
-    },
-    sliderContainer: {
-        gap: 20,
-        marginTop: 20,
-    },
-    sliderLabels: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-    },
-    sliderLabel: {
-        fontSize: 14,
-        fontFamily: "DMSans_500Medium",
-        color: Colors.light.textSecondary,
-    },
-    sliderValueText: {
-        fontSize: 32,
-        fontFamily: "DMSans_700Bold",
-        color: Colors.light.tint,
-        textAlign: 'center',
-        marginTop: 10,
     },
     footer: {
         position: "absolute",

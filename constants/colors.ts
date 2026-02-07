@@ -1,37 +1,65 @@
 const Colors = {
   light: {
-    text: "#E8ECF4",
-    textSecondary: "#8B93A7",
-    textTertiary: "#5A6178",
-    background: "#0A0E1A",
-    surface: "#131829",
-    surfaceElevated: "#1A2035",
-    tint: "#00F0FF",
-    tintLight: "rgba(0, 240, 255, 0.12)",
-    accent: "#FF3D71",
-    accentLight: "rgba(255, 61, 113, 0.12)",
-    positive: "#00E676",
-    positiveLight: "rgba(0, 230, 118, 0.12)",
-    negative: "#FF3D71",
-    negativeLight: "rgba(255, 61, 113, 0.12)",
-    border: "#1E2640",
-    borderLight: "#161D30",
-    tabIconDefault: "#3D4663",
-    tabIconSelected: "#00F0FF",
-    cardShadow: "rgba(0, 240, 255, 0.04)",
-    overlay: "rgba(0, 0, 0, 0.75)",
-    gradient1: "#00F0FF",
-    gradient2: "#0066FF",
-    chartLine: "#00F0FF",
-    chartFill: "rgba(0, 240, 255, 0.08)",
-    chartPrediction: "#FF3D71",
-    chartPredictionFill: "rgba(255, 61, 113, 0.08)",
-    neonGlow: "rgba(0, 240, 255, 0.25)",
-    neonPink: "#FF3D71",
-    neonBlue: "#0066FF",
-    neonGreen: "#00E676",
-    neonPurple: "#B83DFF",
-    neonYellow: "#FFE500",
+    // Text colors
+    text: "#FFFFFF",
+    textSecondary: "#9CA3AF",
+    textTertiary: "#6B7280",
+
+    // Background surfaces - deep dark
+    background: "#0A0D14",
+    surface: "#12161F",
+    surfaceElevated: "#1A1F2E",
+
+    // Primary accent - Lime Green (from reference)
+    tint: "#AAFF00",
+    tintLight: "rgba(170, 255, 0, 0.12)",
+
+    // Secondary accent
+    accent: "#FF6B6B",
+    accentLight: "rgba(255, 107, 107, 0.12)",
+
+    // Semantic colors
+    positive: "#4ADE80",
+    positiveLight: "rgba(74, 222, 128, 0.12)",
+    negative: "#FF6B6B",
+    negativeLight: "rgba(255, 107, 107, 0.12)",
+
+    // Borders - subtle dark
+    border: "#1F2937",
+    borderLight: "#161B26",
+
+    // Tab bar
+    tabIconDefault: "#6B7280",
+    tabIconSelected: "#AAFF00",
+
+    // Shadows and overlays
+    cardShadow: "rgba(170, 255, 0, 0.04)",
+    overlay: "rgba(0, 0, 0, 0.8)",
+
+    // Gradients
+    gradient1: "#AAFF00",
+    gradient2: "#7ACC00",
+
+    // Charts
+    chartLine: "#AAFF00",
+    chartFill: "rgba(170, 255, 0, 0.08)",
+    chartPrediction: "#FF6B6B",
+    chartPredictionFill: "rgba(255, 107, 107, 0.08)",
+
+    // Neon accents for categories
+    neonGlow: "rgba(170, 255, 0, 0.25)",
+    neonPink: "#FF6B6B",
+    neonBlue: "#60A5FA",
+    neonGreen: "#4ADE80",
+    neonPurple: "#A78BFA",
+    neonYellow: "#FBBF24",
+    neonOrange: "#FB923C",
+
+    // Glass effect colors
+    glassBackground: "rgba(18, 22, 31, 0.9)",
+    glassBorder: "rgba(170, 255, 0, 0.15)",
+    glassHighlight: "rgba(255, 255, 255, 0.03)",
+    glassOverlay: "rgba(170, 255, 0, 0.06)",
   },
 };
 
