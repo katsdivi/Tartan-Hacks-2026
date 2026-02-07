@@ -8,6 +8,6 @@
     "merchant_regret_rate",
     "dwell_time"
   ],
-  "threshold": 0.70,
+  "threshold": 0.7,
   "notes": "Probability threshold used for nudges. Keep feature order consistent at inference."
 }
