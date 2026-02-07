@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useMemo, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useMemo, useEffect, ReactNode } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 
@@ -76,69 +76,6 @@ function generateId(): string {
   return Date.now().toString() + Math.random().toString(36).substr(2, 9);
 }
 
-function getDemoAccounts(): Account[] {
-  return [
-    {
-      account_id: "demo-checking",
-      name: "Checking Account",
-      official_name: "Premium Checking",
-      type: "depository",
-      subtype: "checking",
-      balances: { available: 12450.32, current: 12450.32, limit: null },
-    },
-    {
-      account_id: "demo-savings",
-      name: "Savings Account",
-      official_name: "High-Yield Savings",
-      type: "depository",
-      subtype: "savings",
-      balances: { available: 45200.00, current: 45200.00, limit: null },
-    },
-    {
-      account_id: "demo-credit",
-      name: "Credit Card",
-      official_name: "Platinum Rewards",
-      type: "credit",
-      subtype: "credit card",
-      balances: { available: 8500, current: 1520.45, limit: 10000 },
-    },
-    {
-      account_id: "demo-invest",
-      name: "Investment Account",
-      official_name: "Brokerage",
-      type: "investment",
-      subtype: "brokerage",
-      balances: { available: null, current: 78340.18, limit: null },
-    },
-  ];
-}
-
-function getDemoTransactions(): Transaction[] {
-  const now = new Date();
-  const fmtDate = (daysAgo: number) => {
-    const d = new Date(now);
-    d.setDate(d.getDate() - daysAgo);
-    return d.toISOString().split("T")[0];
-  };
-
-  return [
-    { transaction_id: "d1", account_id: "demo-checking", name: "Whole Foods Market", amount: 67.43, date: fmtDate(0), category: ["Food and Drink", "Groceries"], pending: false, merchant_name: "Whole Foods", payment_channel: "in store" },
-    { transaction_id: "d2", account_id: "demo-credit", name: "Netflix", amount: 15.99, date: fmtDate(0), category: ["Entertainment", "Streaming"], pending: false, merchant_name: "Netflix", payment_channel: "online" },
-    { transaction_id: "d3", account_id: "demo-checking", name: "Shell Gas Station", amount: 52.10, date: fmtDate(1), category: ["Travel", "Gas Stations"], pending: false, merchant_name: "Shell", payment_channel: "in store" },
-    { transaction_id: "d4", account_id: "demo-credit", name: "Amazon.com", amount: 124.99, date: fmtDate(1), category: ["Shops", "Online Marketplaces"], pending: false, merchant_name: "Amazon", payment_channel: "online" },
-    { transaction_id: "d5", account_id: "demo-checking", name: "Uber Trip", amount: 23.45, date: fmtDate(2), category: ["Travel", "Taxi"], pending: false, merchant_name: "Uber", payment_channel: "online" },
-    { transaction_id: "d6", account_id: "demo-checking", name: "Starbucks", amount: 6.75, date: fmtDate(2), category: ["Food and Drink", "Coffee Shop"], pending: false, merchant_name: "Starbucks", payment_channel: "in store" },
-    { transaction_id: "d7", account_id: "demo-checking", name: "Payroll Direct Deposit", amount: -3250.00, date: fmtDate(3), category: ["Transfer", "Payroll"], pending: false, merchant_name: null, payment_channel: "other" },
-    { transaction_id: "d8", account_id: "demo-credit", name: "Spotify Premium", amount: 10.99, date: fmtDate(3), category: ["Entertainment", "Music"], pending: false, merchant_name: "Spotify", payment_channel: "online" },
-    { transaction_id: "d9", account_id: "demo-checking", name: "Electric Company", amount: 142.30, date: fmtDate(4), category: ["Service", "Utilities"], pending: false, merchant_name: "ConEdison", payment_channel: "online" },
-    { transaction_id: "d10", account_id: "demo-credit", name: "Target", amount: 89.50, date: fmtDate(4), category: ["Shops", "Department Stores"], pending: false, merchant_name: "Target", payment_channel: "in store" },
-    { transaction_id: "d11", account_id: "demo-checking", name: "Chipotle", amount: 14.25, date: fmtDate(5), category: ["Food and Drink", "Restaurants"], pending: false, merchant_name: "Chipotle", payment_channel: "in store" },
-    { transaction_id: "d12", account_id: "demo-checking", name: "Planet Fitness", amount: 24.99, date: fmtDate(5), category: ["Recreation", "Gyms"], pending: false, merchant_name: "Planet Fitness", payment_channel: "online" },
-    { transaction_id: "d13", account_id: "demo-credit", name: "DoorDash", amount: 32.40, date: fmtDate(6), category: ["Food and Drink", "Restaurants"], pending: false, merchant_name: "DoorDash", payment_channel: "online" },
-    { transaction_id: "d14", account_id: "demo-checking", name: "Venmo Transfer", amount: -50.00, date: fmtDate(6), category: ["Transfer", "Third Party"], pending: false, merchant_name: "Venmo", payment_channel: "online" },
-  ];
-}
-
 function categorizeToBudget(transaction: Transaction): string | null {
   const cats = transaction.category || [];
   const name = transaction.name.toLowerCase();
@@ -152,15 +89,23 @@ function categorizeToBudget(transaction: Transaction): string | null {
   return null;
 }
 
+const DEMO_MODE_ENV = process.env.EXPO_PUBLIC_DEMO_MODE === "1";
+
 export function FinanceProvider({ children }: { children: ReactNode }) {
   const [isConnected, setIsConnected] = useState(false);
-  const [isDemoMode, setIsDemoMode] = useState(false);
+  const [isDemoMode, setIsDemoMode] = useState(DEMO_MODE_ENV); // Initialize from env
   const [isLoading, setIsLoading] = useState(false);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [budgets, setBudgets] = useState<BudgetCategory[]>(DEFAULT_BUDGETS);
   const [netWorthHistory, setNetWorthHistory] = useState<NetWorthHistory[]>([]);
   const [connectionError, setConnectionError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (DEMO_MODE_ENV) {
+      loadDemoData();
+    }
+  }, []); // Run once on mount
 
   const totalNetWorth = useMemo(() => {
     return accounts.reduce((sum, acc) => {
@@ -260,40 +205,53 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const loadDemoData = useCallback(() => {
-    const demoAccounts = getDemoAccounts();
-    const demoTransactions = getDemoTransactions();
-    setAccounts(demoAccounts);
-    setTransactions(demoTransactions);
-    setIsConnected(true);
-    setIsDemoMode(true);
+    // This function will now fetch from backend's demo endpoints
+    // No need for client-side dummy data generation anymore
+    setIsLoading(true);
+    // Simulate API call for demo data
+    Promise.all([
+      apiRequest("GET", "/api/plaid/accounts").then(res => res.json()),
+      apiRequest("GET", "/api/plaid/transactions").then(res => res.json()),
+    ]).then(([accountsData, transactionsData]) => {
+      const demoAccounts = accountsData.accounts || [];
+      const demoTransactions = transactionsData.transactions || [];
+      setAccounts(demoAccounts);
+      setTransactions(demoTransactions);
+      setIsConnected(true);
+      setIsDemoMode(true);
 
-    const netWorth = demoAccounts.reduce((sum, acc) => {
-      const bal = acc.balances.current || acc.balances.available || 0;
-      if (acc.type === "credit" || acc.type === "loan") return sum - bal;
-      return sum + bal;
-    }, 0);
-    generateNetWorthHistory(netWorth);
+      const netWorth = demoAccounts.reduce((sum, acc) => {
+        const bal = acc.balances.current || acc.balances.available || 0;
+        if (acc.type === "credit" || acc.type === "loan") return sum - bal;
+        return sum + bal;
+      }, 0);
+      generateNetWorthHistory(netWorth);
 
-    const currentBudgets = [...DEFAULT_BUDGETS];
-    const spending: Record<string, number> = {};
-    demoTransactions.forEach((tx) => {
-      if (tx.amount > 0) {
-        const budgetId = categorizeToBudget(tx);
-        if (budgetId) {
-          spending[budgetId] = (spending[budgetId] || 0) + tx.amount;
+      const currentBudgets = [...DEFAULT_BUDGETS];
+      const spending: Record<string, number> = {};
+      demoTransactions.forEach((tx) => {
+        if (tx.amount > 0) {
+          const budgetId = categorizeToBudget(tx);
+          if (budgetId) {
+            spending[budgetId] = (spending[budgetId] || 0) + tx.amount;
+          }
         }
-      }
+      });
+      const updated = currentBudgets.map((b) => ({
+        ...b,
+        spent: Math.round((spending[b.id] || 0) * 100) / 100,
+      }));
+      setBudgets(updated);
+      saveBudgets(updated);
+    }).catch(err => {
+      console.error("Failed to load demo data from backend:", err);
+      setConnectionError("Failed to load demo data. Please ensure backend is running.");
+    }).finally(() => {
+      setIsLoading(false);
     });
-    const updated = currentBudgets.map((b) => ({
-      ...b,
-      spent: Math.round((spending[b.id] || 0) * 100) / 100,
-    }));
-    setBudgets(updated);
-    saveBudgets(updated);
   }, [generateNetWorthHistory, saveBudgets]);
 
   const refreshData = useCallback(async () => {
-    if (isDemoMode) return;
     setIsLoading(true);
     try {
       await loadBudgets();
@@ -310,15 +268,25 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         const stored = await AsyncStorage.getItem("budgets");
         const currentBudgets = stored ? JSON.parse(stored) : DEFAULT_BUDGETS;
         updateBudgetSpending(txns, currentBudgets);
+      } else if (DEMO_MODE_ENV) { // If not connected but in demo mode, load demo data
+        loadDemoData();
       }
     } finally {
       setIsLoading(false);
     }
-  }, [isDemoMode, checkConnection, fetchAccounts, fetchTransactions, loadBudgets, generateNetWorthHistory, updateBudgetSpending]);
+  }, [DEMO_MODE_ENV, checkConnection, fetchAccounts, fetchTransactions, loadBudgets, generateNetWorthHistory, updateBudgetSpending, loadDemoData]);
 
   const connectBank = useCallback(async (publicToken: string) => {
     setIsLoading(true);
     try {
+      if (DEMO_MODE_ENV) {
+        // In demo mode, simulate successful connection and load demo data
+        setIsConnected(true);
+        setIsDemoMode(true);
+        await loadDemoData();
+        return;
+      }
+
       const res = await apiRequest("POST", "/api/plaid/exchange-token", { public_token: publicToken });
       if (!res.ok) {
         throw new Error("Token exchange failed");
@@ -332,7 +300,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [refreshData]);
+  }, [DEMO_MODE_ENV, refreshData, loadDemoData]);
 
   const disconnectBank = useCallback(async () => {
     try {

@@ -17,6 +17,8 @@ import { router } from "expo-router";
 import { useFinance } from "@/lib/finance-context";
 import Colors from "@/constants/colors";
 
+const DEMO_MODE_ENV = process.env.EXPO_PUBLIC_DEMO_MODE === "1";
+
 function formatCurrency(amount: number): string {
   const abs = Math.abs(amount);
   if (abs >= 1000000) return `$${(amount / 1000000).toFixed(1)}M`;
@@ -208,11 +210,17 @@ export default function DashboardScreen() {
             </Text>
             <View style={styles.connectActions}>
               <Pressable
-                style={({ pressed }) => [styles.connectButton, pressed && { opacity: 0.9 }]}
-                onPress={() => router.push("/plaid-link")}
+                style={({ pressed }) => [
+                  styles.connectButton,
+                  pressed && { opacity: 0.9 },
+                  DEMO_MODE_ENV && { backgroundColor: Colors.light.surfaceElevated } // Visually disable
+                ]}
+                onPress={DEMO_MODE_ENV ? loadDemoData : () => router.push("/plaid-link")} // Load demo data if DEMO_MODE, else go to Plaid
               >
-                <Text style={styles.connectButtonText}>Connect Account</Text>
-                <Ionicons name="arrow-forward" size={18} color={Colors.light.gradient1} />
+                <Text style={[styles.connectButtonText, DEMO_MODE_ENV && { color: Colors.light.textSecondary }]}>
+                  {DEMO_MODE_ENV ? "Connect Bank (Dev Build)" : "Connect Account"}
+                </Text>
+                {!DEMO_MODE_ENV && <Ionicons name="arrow-forward" size={18} color={Colors.light.gradient1} />}
               </Pressable>
               <Pressable
                 style={({ pressed }) => [styles.demoButton, pressed && { opacity: 0.7 }]}

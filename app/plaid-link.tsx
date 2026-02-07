@@ -16,6 +16,8 @@ import { useFinance } from "@/lib/finance-context";
 import { createLinkToken } from "@/lib/plaid-service";
 import Colors from "@/constants/colors";
 
+const DEMO_MODE_ENV = process.env.EXPO_PUBLIC_DEMO_MODE === "1";
+
 export default function PlaidLinkScreen() {
   const insets = useSafeAreaInsets();
   const { connectBank, loadDemoData } = useFinance();
@@ -27,6 +29,12 @@ export default function PlaidLinkScreen() {
   const webViewRef = useRef<WebView>(null);
 
   useEffect(() => {
+    if (DEMO_MODE_ENV) {
+      // If in demo mode, skip Plaid Link and load demo data directly
+      loadDemoData();
+      router.back();
+      return;
+    }
     initPlaidLink();
   }, []);
 

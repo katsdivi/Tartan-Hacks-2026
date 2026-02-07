@@ -5,6 +5,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import dotenv; dotenv.load_dotenv() # Add this line
 
+import random
+from datetime import date, timedelta
 import google.generativeai as genai
 
 
@@ -48,7 +50,107 @@ import requests # Added for debugging
 
 app = FastAPI()
 
+# --- DEMO MODE CONFIGURATION ---
+DEMO_MODE = os.environ.get("EXPO_PUBLIC_DEMO_MODE", "0") == "1"
 
+demo_accounts_data = [
+    {
+        "account_id": "demo_checking",
+        "name": "Plaid Checking",
+        "official_name": "Plaid Checking Account",
+        "type": "depository",
+        "subtype": "checking",
+        "mask": "0000",
+        "balances": {
+            "available": 1200.00,
+            "current": 1250.00,
+            "limit": None,
+            "iso_currency_code": "USD",
+        },
+    },
+    {
+        "account_id": "demo_credit",
+        "name": "Plaid Credit Card",
+        "official_name": "Plaid Visa Card",
+        "type": "credit",
+        "subtype": "credit card",
+        "mask": "1111",
+        "balances": {
+            "available": 5000.00,
+            "current": 2500.00,
+            "limit": 7500.00,
+            "iso_currency_code": "USD",
+        },
+    },
+]
+
+def generate_demo_transactions():
+    transactions = []
+    today = date.today()
+
+    categories = [
+        ["Food and Drink", "Restaurants"],
+        ["Food and Drink", "Groceries"],
+        ["Travel", "Airlines and Aviation Services"],
+        ["Transfer", "Credit Card Payment"],
+        ["Payment", "Payroll"],
+        ["Shops", "Electronics"],
+        ["Service", "Utilities"],
+    ]
+    merchants = [
+        "Starbucks", "Whole Foods", "Delta Airlines", "Rent Payment",
+        "Apple Store", "Electric Company", "Netflix", "Uber Eats"
+    ]
+    amounts = [5.50, 15.20, 250.00, 1200.00, 3000.00, 799.99, 50.00, 22.50]
+    payment_channels = ["in store", "online", "other"]
+
+    for i in range(30):
+        transaction_date = today - timedelta(days=i)
+        for _ in range(random.randint(0, 2)): # 0 to 2 transactions per day
+            category = random.choice(categories)
+            merchant = random.choice(merchants)
+            amount = round(random.choice(amounts) * random.uniform(0.8, 1.2), 2)
+            payment_channel = random.choice(payment_channels)
+            account_id = random.choice(["demo_checking", "demo_credit"])
+
+            transactions.append({
+                "transaction_id": f"demo_txn_{len(transactions)}",
+                "account_id": account_id,
+                "name": merchant,
+                "amount": amount if account_id == "demo_checking" else -amount, # Simulate credit card spend
+                "date": str(transaction_date),
+                "category": category,
+                "pending": False,
+                "merchant_name": merchant,
+                "payment_channel": payment_channel,
+                "iso_currency_code": "USD",
+            })
+    # Add a couple of "regrettable" and "anomaly" transactions
+    transactions.append({
+        "transaction_id": "demo_txn_regret_1", "account_id": "demo_checking",
+        "name": "McDonald's", "amount": 8.75, "date": str(today - timedelta(days=2)),
+        "category": ["Food and Drink", "Fast Food"], "pending": False, "merchant_name": "McDonald's",
+        "payment_channel": "in store", "iso_currency_code": "USD",
+    })
+    transactions.append({
+        "transaction_id": "demo_txn_anomaly_1", "account_id": "demo_checking",
+        "name": "Big Apple Purchase", "amount": 1500.00, "date": str(today - timedelta(days=5)),
+        "category": ["Shops", "Electronics"], "pending": False, "merchant_name": "Apple",
+        "payment_channel": "online", "iso_currency_code": "USD",
+    })
+    transactions.append({
+        "transaction_id": "demo_txn_paycheck", "account_id": "demo_checking",
+        "name": "Payroll Deposit", "amount": -3500.00, "date": str(today - timedelta(days=7)),
+        "category": ["Transfer", "Deposit"], "pending": False, "merchant_name": "Employer",
+        "payment_channel": "other", "iso_currency_code": "USD",
+    })
+
+
+    return transactions
+
+demo_transactions_data = generate_demo_transactions()
+
+# --- END DEMO MODE CONFIGURATION ---
 
 PLAID_CLIENT_ID = os.environ.get("PLAID_CLIENT_ID", "")
 
@@ -86,19 +188,18 @@ stored_item_id: str | None = None
 class CORSMiddlewareCustom(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         origin = request.headers.get("origin", "")
-
+        # For debugging, log the origin and if it's considered localhost
+        print(f"CORS Request Origin: {origin}")
         is_localhost = origin.startswith("http://localhost:") or origin.startswith("http://127.0.0.1:")
+        print(f"Is localhost: {is_localhost}")
 
-        if request.method == "OPTIONS":
-            response = Response(status_code=200)
-        else:
-            response = await call_next(request)
+        response = await call_next(request)
 
-        if is_localhost:
-            response.headers["Access-Control-Allow-Origin"] = origin
-            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-            response.headers["Access-Control-Allow-Headers"] = "Content-Type"
-            response.headers["Access-Control-Allow-Credentials"] = "true"
+        # Allow all origins for local development. In production, this should be restricted.
+        response.headers["Access-Control-Allow-Origin"] = origin if origin else "*" # Allow specific origin if present, else all (for development)
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization" # Added Authorization header
+        response.headers["Access-Control-Allow-Credentials"] = "true" # Always allow credentials for now
 
         return response
 
@@ -157,6 +258,9 @@ def health():
 
 @app.post("/api/plaid/create-link-token")
 async def create_link_token():
+    if DEMO_MODE:
+        return {"link_token": "demo-link-token"}
+    
     print(f"Plaid Configuration: {configuration}")
     try:
         # Test basic requests connectivity
@@ -188,6 +292,11 @@ async def create_link_token():
 @app.post("/api/plaid/exchange-token")
 async def exchange_token(request: Request):
     global stored_access_token, stored_item_id
+    if DEMO_MODE:
+        stored_access_token = "demo-access-token"
+        stored_item_id = "demo-item-id"
+        return {"success": True}
+
     try:
         body = await request.json()
         public_token = body.get("public_token")
@@ -207,6 +316,9 @@ async def exchange_token(request: Request):
 
 @app.get("/api/plaid/accounts")
 async def get_accounts():
+    if DEMO_MODE:
+        return {"accounts": demo_accounts_data}
+    
     try:
         if not stored_access_token:
             return JSONResponse({"error": "No bank account connected"}, status_code=400)
@@ -240,6 +352,12 @@ async def get_accounts():
 
 @app.get("/api/plaid/transactions")
 async def get_transactions():
+    if DEMO_MODE:
+        return {
+            "transactions": demo_transactions_data,
+            "total": len(demo_transactions_data),
+        }
+    
     try:
         if not stored_access_token:
             return JSONResponse({"error": "No bank account connected"}, status_code=400)
@@ -285,6 +403,9 @@ async def get_transactions():
 
 @app.get("/api/plaid/balance")
 async def get_balance():
+    if DEMO_MODE:
+        return {"accounts": demo_accounts_data} # Same as get_accounts for simplicity
+    
     try:
         if not stored_access_token:
             return JSONResponse({"error": "No bank account connected"}, status_code=400)
@@ -318,12 +439,19 @@ async def get_balance():
 
 @app.get("/api/plaid/status")
 async def plaid_status():
+    if DEMO_MODE:
+        return {"connected": True} # Always connected in demo mode
     return {"connected": stored_access_token is not None}
 
 
 @app.post("/api/plaid/disconnect")
 async def plaid_disconnect():
     global stored_access_token, stored_item_id
+    if DEMO_MODE:
+        stored_access_token = None
+        stored_item_id = None
+        return {"success": True}
+
     stored_access_token = None
     stored_item_id = None
     return {"success": True}
