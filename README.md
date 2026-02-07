@@ -1,4 +1,4 @@
-# 🕊️Pegion
+# 🕊️ Pigeon
 
 A premium personal finance management app built with React Native (Expo) and Python FastAPI. Features AI-powered financial advice, location-based spending alerts, and seamless bank integration.
 
