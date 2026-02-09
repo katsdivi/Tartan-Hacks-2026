@@ -1,5 +1,23 @@
 # Running Pigeon on iOS Simulator
 
+**Project path:** `/Users/samruch/Documents/Tartan-Hacks-2026`
+
+## Connecting to the branch
+
+If you already have the repo cloned:
+```bash
+cd /Users/samruch/Documents/Tartan-Hacks-2026
+git checkout sam/changes
+git pull
+```
+
+If cloning fresh on another machine:
+```bash
+git clone https://github.com/katsdivi/Tartan-Hacks-2026.git
+cd Tartan-Hacks-2026
+git checkout sam/changes
+```
+
 ## Prerequisites
 - All npm and Python dependencies installed
 - `.env` configured with API keys
